@@ -28,62 +28,6 @@ interface Contact {
   contact_tags?: Array<{ tags: { id: string; name: string; color: string } }>;
 }
 
-// ── Mock Data ──────────────────────────────────────────
-const MOCK_GROUPS: Group[] = [
-  { id: "g1", name: "Leads BH - Março", description: "Leads qualificados de Belo Horizonte", contact_count: 5, created_at: "2026-03-28T10:00:00Z" },
-  { id: "g2", name: "Campanha SP", description: "Base de São Paulo para campanha de abril", contact_count: 3, created_at: "2026-03-25T14:00:00Z" },
-  { id: "g3", name: "VIPs Nacional", description: "Clientes VIP de todo o Brasil", contact_count: 4, created_at: "2026-03-20T09:00:00Z" },
-  { id: "g4", name: "Recontato - Erros", description: "Contatos que deram erro na última campanha", contact_count: 2, created_at: "2026-03-18T16:00:00Z" },
-];
-
-const MOCK_GROUP_CONTACTS: Record<string, Contact[]> = {
-  g1: [
-    { id: "3", first_name: "Fernando", last_name: "Torres", display_name: "Fernando Torres", phone: "5531999112233", city: "Belo Horizonte", state: "MG", organization: null, is_valid: true, is_blacklisted: false, created_at: "2026-03-30T09:30:00Z", contact_tags: [{ tags: { id: "t4", name: "Follow-up", color: "#71717a" } }] },
-    { id: "5", first_name: "Carlos", last_name: "Mendes", display_name: "Carlos Mendes", phone: "5531977665544", city: "Belo Horizonte", state: "MG", organization: "Advocacia Mendes", is_valid: true, is_blacklisted: false, created_at: "2026-03-29T14:00:00Z", contact_tags: [{ tags: { id: "t5", name: "B2B", color: "#34d399" } }] },
-    { id: "8", first_name: "Beatriz", last_name: "Almeida", display_name: "Beatriz Almeida", phone: "5531988997766", city: "Contagem", state: "MG", organization: "Studio Bea", is_valid: true, is_blacklisted: false, created_at: "2026-03-28T09:00:00Z", contact_tags: [{ tags: { id: "t3", name: "Qualificado", color: "#34d399" } }] },
-    { id: "11", first_name: "Roberto", last_name: "Santos", display_name: "Roberto Santos", phone: "5531944556677", city: "Betim", state: "MG", organization: "RS Imports", is_valid: true, is_blacklisted: false, created_at: "2026-03-27T10:00:00Z", contact_tags: [] },
-    { id: "13", first_name: "Luciana", last_name: "Braga", display_name: "Luciana Braga", phone: "5531922334455", city: "Belo Horizonte", state: "MG", organization: "LB Design", is_valid: true, is_blacklisted: false, created_at: "2026-03-26T11:00:00Z", contact_tags: [{ tags: { id: "t1", name: "Lead Quente", color: "#a78bfa" } }] },
-  ],
-  g2: [
-    { id: "1", first_name: "Ricardo", last_name: "Lemos", display_name: "Ricardo Lemos", phone: "5511988776655", city: "São Paulo", state: "SP", organization: "Tech Solutions", is_valid: true, is_blacklisted: false, created_at: "2026-03-30T10:00:00Z", contact_tags: [{ tags: { id: "t1", name: "Lead Quente", color: "#a78bfa" } }] },
-    { id: "6", first_name: "Juliana", last_name: "Rocha", display_name: "Juliana Rocha", phone: "5511944332211", city: "São Paulo", state: "SP", organization: null, is_valid: false, is_blacklisted: false, created_at: "2026-03-29T12:00:00Z", contact_tags: [] },
-    { id: "12", first_name: "Patrícia", last_name: "Lima", display_name: "Patrícia Lima", phone: "5511933445566", city: "Guarulhos", state: "SP", organization: null, is_valid: true, is_blacklisted: false, created_at: "2026-03-26T14:00:00Z", contact_tags: [{ tags: { id: "t3", name: "Qualificado", color: "#34d399" } }] },
-  ],
-  g3: [
-    { id: "1", first_name: "Ricardo", last_name: "Lemos", display_name: "Ricardo Lemos", phone: "5511988776655", city: "São Paulo", state: "SP", organization: "Tech Solutions", is_valid: true, is_blacklisted: false, created_at: "2026-03-30T10:00:00Z", contact_tags: [{ tags: { id: "t2", name: "VIP", color: "#71717a" } }] },
-    { id: "4", first_name: "Ana", last_name: "Costa", display_name: "Ana Costa", phone: "5541988223344", city: "Curitiba", state: "PR", organization: "Construtora ABC", is_valid: true, is_blacklisted: false, created_at: "2026-03-29T15:00:00Z", contact_tags: [{ tags: { id: "t2", name: "VIP", color: "#71717a" } }] },
-    { id: "9", first_name: "Lucas", last_name: "Ferreira", display_name: "Lucas Ferreira", phone: "5571999887766", city: "Salvador", state: "BA", organization: null, is_valid: true, is_blacklisted: false, created_at: "2026-03-27T18:00:00Z", contact_tags: [{ tags: { id: "t2", name: "VIP", color: "#71717a" } }] },
-    { id: "10", first_name: "Camila", last_name: "Nascimento", display_name: "Camila Nascimento", phone: "5561977665544", city: "Brasília", state: "DF", organization: "Gov Solutions", is_valid: true, is_blacklisted: false, created_at: "2026-03-27T16:00:00Z", contact_tags: [{ tags: { id: "t2", name: "VIP", color: "#71717a" } }] },
-  ],
-  g4: [
-    { id: "3", first_name: "Fernando", last_name: "Torres", display_name: "Fernando Torres", phone: "5531999112233", city: "Belo Horizonte", state: "MG", organization: null, is_valid: true, is_blacklisted: false, created_at: "2026-03-30T09:30:00Z", contact_tags: [] },
-    { id: "7", first_name: "Pedro", last_name: "Oliveira", display_name: "Pedro Oliveira", phone: "5521966554433", city: "Niterói", state: "RJ", organization: "PE Consulting", is_valid: true, is_blacklisted: true, created_at: "2026-03-28T10:00:00Z", contact_tags: [] },
-  ],
-};
-
-const MOCK_CAMPAIGN_STATS: Record<string, { lastCampaign: string; delivered: number; failed: number; total: number }> = {
-  g1: { lastCampaign: "28/03/2026", delivered: 4, failed: 1, total: 5 },
-  g2: { lastCampaign: "25/03/2026", delivered: 2, failed: 1, total: 3 },
-  g3: { lastCampaign: "22/03/2026", delivered: 4, failed: 0, total: 4 },
-  g4: { lastCampaign: "20/03/2026", delivered: 0, failed: 2, total: 2 },
-};
-
-const MOCK_LAST_MESSAGES: Record<string, { date: string | null; status: "delivered" | "error" | "read" | null }> = {
-  "1": { date: "30/03/2026 14:32", status: "delivered" },
-  "2": { date: "30/03/2026 14:28", status: "read" },
-  "3": { date: "29/03/2026 10:15", status: "error" },
-  "4": { date: "28/03/2026 16:00", status: "delivered" },
-  "5": { date: "28/03/2026 15:45", status: "delivered" },
-  "6": { date: null, status: null },
-  "7": { date: "27/03/2026 09:00", status: "error" },
-  "8": { date: "30/03/2026 11:00", status: "read" },
-  "9": { date: "29/03/2026 08:30", status: "delivered" },
-  "10": { date: "26/03/2026 17:00", status: "delivered" },
-  "11": { date: null, status: null },
-  "12": { date: "25/03/2026 10:00", status: "delivered" },
-  "13": { date: "28/03/2026 14:00", status: "delivered" },
-};
-
 // ── Component ──────────────────────────────────────────
 export default function Groups() {
   const queryClient = useQueryClient();
@@ -99,7 +43,7 @@ export default function Groups() {
     queryFn: () => api.get<Group[]>("/lists"),
   });
 
-  const groups = apiGroups?.length ? apiGroups : MOCK_GROUPS;
+  const groups = apiGroups ?? [];
 
   // Fetch group contacts from API
   const { data: apiGroupContacts } = useQuery({
@@ -111,15 +55,10 @@ export default function Groups() {
     enabled: !!selectedGroupId,
   });
 
-  // Use API data or mock
   const selectedGroup = groups.find((g) => g.id === selectedGroupId) ?? null;
   const groupContacts = useMemo(() => {
-    if (apiGroupContacts?.data?.length) return apiGroupContacts.data;
-    if (selectedGroupId && MOCK_GROUP_CONTACTS[selectedGroupId]) return MOCK_GROUP_CONTACTS[selectedGroupId];
-    return [];
-  }, [apiGroupContacts, selectedGroupId]);
-
-  const campaignStats = selectedGroupId ? MOCK_CAMPAIGN_STATS[selectedGroupId] : null;
+    return apiGroupContacts?.data ?? [];
+  }, [apiGroupContacts]);
 
   // Client-side search filter
   const filteredContacts = useMemo(() => {
@@ -230,9 +169,6 @@ export default function Groups() {
               ) : (
                 groups.map((group) => {
                   const isActive = selectedGroupId === group.id;
-                  const stats = MOCK_CAMPAIGN_STATS[group.id];
-                  const deliveryPct = stats ? Math.round((stats.delivered / stats.total) * 100) : 0;
-
                   return (
                     <button
                       key={group.id}
@@ -251,16 +187,6 @@ export default function Groups() {
                       </div>
                       {group.description && (
                         <p className="text-[10px] text-secondary truncate mt-0.5">{group.description}</p>
-                      )}
-                      {/* Mini progress bar */}
-                      {stats && (
-                        <div className="flex items-center gap-2 mt-2">
-                          <div className="h-1 flex-1 bg-outline-variant rounded-full overflow-hidden flex">
-                            <div className="h-full bg-tertiary rounded-l-full" style={{ width: `${deliveryPct}%` }} />
-                            <div className="h-full bg-error rounded-r-full" style={{ width: `${100 - deliveryPct}%` }} />
-                          </div>
-                          <span className="text-[9px] text-secondary font-mono">{deliveryPct}%</span>
-                        </div>
                       )}
                     </button>
                   );
@@ -335,54 +261,12 @@ export default function Groups() {
                 </div>
 
                 {/* Stats row */}
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-6">
+                <div className="grid grid-cols-1 gap-4 mt-6">
                   <div className="bg-surface-container-high/50 rounded-lg p-3">
                     <p className="text-[10px] font-semibold uppercase tracking-widest text-secondary">Contatos</p>
-                    <p className="text-xl font-bold font-mono mt-1">{groupContacts.length}</p>
-                  </div>
-                  <div className="bg-surface-container-high/50 rounded-lg p-3">
-                    <p className="text-[10px] font-semibold uppercase tracking-widest text-secondary">Última Campanha</p>
-                    <p className="text-sm font-mono mt-1 text-on-surface-variant">{campaignStats?.lastCampaign ?? "-"}</p>
-                  </div>
-                  <div className="bg-surface-container-high/50 rounded-lg p-3">
-                    <p className="text-[10px] font-semibold uppercase tracking-widest text-secondary">Entregues</p>
-                    <p className="text-xl font-bold font-mono mt-1 text-tertiary">{campaignStats?.delivered ?? 0}</p>
-                  </div>
-                  <div className="bg-surface-container-high/50 rounded-lg p-3">
-                    <p className="text-[10px] font-semibold uppercase tracking-widest text-secondary">Falhas</p>
-                    <p className="text-xl font-bold font-mono mt-1 text-error">{campaignStats?.failed ?? 0}</p>
+                    <p className="text-xl font-bold font-mono mt-1">{selectedGroup.contact_count}</p>
                   </div>
                 </div>
-
-                {/* Progress bar */}
-                {campaignStats && campaignStats.total > 0 && (
-                  <div className="mt-4">
-                    <div className="flex items-center justify-between mb-1.5">
-                      <span className="text-[10px] font-semibold uppercase tracking-widest text-secondary">Taxa de Entrega</span>
-                      <span className="text-xs font-mono text-on-surface-variant">
-                        {campaignStats.delivered}/{campaignStats.total} ({Math.round((campaignStats.delivered / campaignStats.total) * 100)}%)
-                      </span>
-                    </div>
-                    <div className="h-2.5 w-full bg-outline-variant rounded-full overflow-hidden flex">
-                      <div
-                        className="h-full bg-tertiary transition-all duration-500 rounded-l-full"
-                        style={{ width: `${(campaignStats.delivered / campaignStats.total) * 100}%` }}
-                      />
-                      <div
-                        className="h-full bg-error transition-all duration-500 rounded-r-full"
-                        style={{ width: `${(campaignStats.failed / campaignStats.total) * 100}%` }}
-                      />
-                    </div>
-                    <div className="flex items-center gap-4 mt-2">
-                      <span className="flex items-center gap-1.5 text-[10px] text-secondary">
-                        <span className="w-2 h-2 rounded-full bg-tertiary" /> Entregues
-                      </span>
-                      <span className="flex items-center gap-1.5 text-[10px] text-secondary">
-                        <span className="w-2 h-2 rounded-full bg-error" /> Falhas
-                      </span>
-                    </div>
-                  </div>
-                )}
               </div>
 
               {/* ── Bulk actions ── */}
@@ -441,7 +325,6 @@ export default function Groups() {
                         <th className="px-4 py-4 text-[10px] font-black uppercase tracking-widest text-secondary hidden xl:table-cell">Cidade/UF</th>
                         <th className="px-4 py-4 text-[10px] font-black uppercase tracking-widest text-secondary hidden lg:table-cell">Empresa</th>
                         <th className="px-4 py-4 text-[10px] font-black uppercase tracking-widest text-secondary hidden md:table-cell">Tags</th>
-                        <th className="px-4 py-4 text-[10px] font-black uppercase tracking-widest text-secondary hidden xl:table-cell">Última Msg</th>
                         <th className="px-4 py-4 text-[10px] font-black uppercase tracking-widest text-secondary">Status</th>
                         <th className="px-4 py-4 text-[10px] font-black uppercase tracking-widest text-secondary text-right">Ações</th>
                       </tr>
@@ -451,7 +334,6 @@ export default function Groups() {
                         <tr><td colSpan={9} className="px-6 py-16 text-center text-secondary">Nenhum contato neste grupo</td></tr>
                       ) : (
                         paginatedContacts.map((contact) => {
-                          const lastMsg = MOCK_LAST_MESSAGES[contact.id];
                           const isSelected = selectedContactIds.has(contact.id);
                           return (
                             <tr key={contact.id} className={`transition-colors group ${isSelected ? "bg-primary/5" : "hover:bg-surface-bright/30"}`}>
@@ -496,26 +378,17 @@ export default function Groups() {
                                   ))}
                                 </div>
                               </td>
-                              <td className="px-4 py-3 hidden xl:table-cell">
-                                <span className="text-[11px] text-secondary font-mono">{lastMsg?.date || "-"}</span>
-                              </td>
                               <td className="px-4 py-3">
                                 {contact.is_blacklisted ? (
                                   <span className="text-[9px] font-bold px-2 py-0.5 rounded bg-error-container text-on-error-container border border-error/20">BLOQUEADO</span>
-                                ) : lastMsg?.status === "error" ? (
+                                ) : !contact.is_valid ? (
                                   <span className="text-[9px] font-bold px-2 py-0.5 rounded bg-error/10 text-error border border-error/20 flex items-center gap-1 w-fit">
-                                    <span className="w-1.5 h-1.5 rounded-full bg-error" /> ERRO
-                                  </span>
-                                ) : lastMsg?.status === "read" ? (
-                                  <span className="text-[9px] font-bold px-2 py-0.5 rounded bg-tertiary/10 text-tertiary border border-tertiary/20 flex items-center gap-1 w-fit">
-                                    <span className="material-symbols-outlined text-[12px]">done_all</span> LIDA
-                                  </span>
-                                ) : lastMsg?.status === "delivered" ? (
-                                  <span className="text-[9px] font-bold px-2 py-0.5 rounded bg-primary/10 text-primary border border-primary/20 flex items-center gap-1 w-fit">
-                                    <span className="material-symbols-outlined text-[12px]">done</span> ENTREGUE
+                                    <span className="w-1.5 h-1.5 rounded-full bg-error" /> INVÁLIDO
                                   </span>
                                 ) : (
-                                  <span className="text-[9px] font-bold px-2 py-0.5 rounded bg-surface-container-highest text-secondary border border-outline-variant">NOVO</span>
+                                  <span className="text-[9px] font-bold px-2 py-0.5 rounded bg-tertiary/10 text-tertiary border border-tertiary/20 flex items-center gap-1 w-fit">
+                                    <span className="w-1.5 h-1.5 rounded-full bg-tertiary" /> VÁLIDO
+                                  </span>
                                 )}
                               </td>
                               <td className="px-4 py-3 text-right">
