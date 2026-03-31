@@ -64,6 +64,7 @@ export async function importRoutes(app: FastifyInstance) {
           organization_title: z.string().optional(),
           city: z.string().optional(),
           state: z.string().optional(),
+          city_state: z.string().optional(),
           address: z.string().optional(),
         }),
         auto_tag_id: z.string().uuid().optional(),
@@ -161,8 +162,12 @@ export async function importRoutes(app: FastifyInstance) {
               organization_title: mapping.organization_title
                 ? String(row[mapping.organization_title] || "") || null
                 : null,
-              city: mapping.city ? String(row[mapping.city] || "") || null : null,
-              state: mapping.state ? String(row[mapping.state] || "") || null : null,
+              city: mapping.city_state
+                ? (String(row[mapping.city_state] || "").split("/")[0]?.trim() || null)
+                : (mapping.city ? String(row[mapping.city] || "") || null : null),
+              state: mapping.city_state
+                ? (String(row[mapping.city_state] || "").split("/")[1]?.trim() || null)
+                : (mapping.state ? String(row[mapping.state] || "") || null : null),
               address: mapping.address ? String(row[mapping.address] || "") || null : null,
               is_valid: isValid,
               source: "import",

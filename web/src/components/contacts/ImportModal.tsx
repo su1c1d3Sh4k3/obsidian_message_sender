@@ -26,8 +26,9 @@ export default function ImportModal({ open, onClose }: Props) {
     { key: "first_name", label: "Primeiro Nome" },
     { key: "phone", label: "Número" },
     { key: "organization", label: "Empresa" },
-    { key: "city", label: "Cidade" },
-    { key: "state", label: "Estado" },
+    { key: "city_state", label: "Cidade/Estado" },
+    { key: "city", label: "Cidade (separado)" },
+    { key: "state", label: "Estado (separado)" },
   ];
 
   async function handleUpload(file: File) {
@@ -64,11 +65,17 @@ export default function ImportModal({ open, onClose }: Props) {
       if (colLower.some((c) => c.includes("empresa") || c.includes("organization"))) {
         autoMap.organization = data.columns[colLower.findIndex((c) => c.includes("empresa") || c.includes("organization"))];
       }
-      if (colLower.some((c) => c.includes("cidade"))) {
-        autoMap.city = data.columns[colLower.findIndex((c) => c.includes("cidade"))];
-      }
-      if (colLower.some((c) => c.includes("estado"))) {
-        autoMap.state = data.columns[colLower.findIndex((c) => c.includes("estado"))];
+      // Detect combined "Cidade/Estado" column
+      const cityStateIdx = colLower.findIndex((c) => c.includes("cidade") && c.includes("estado"));
+      if (cityStateIdx >= 0) {
+        autoMap.city_state = data.columns[cityStateIdx];
+      } else {
+        if (colLower.some((c) => c.includes("cidade"))) {
+          autoMap.city = data.columns[colLower.findIndex((c) => c.includes("cidade"))];
+        }
+        if (colLower.some((c) => c.includes("estado"))) {
+          autoMap.state = data.columns[colLower.findIndex((c) => c.includes("estado"))];
+        }
       }
       setMapping(autoMap);
     } catch (err) {
