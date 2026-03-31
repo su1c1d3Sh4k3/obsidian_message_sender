@@ -112,12 +112,14 @@ export async function importRoutes(app: FastifyInstance) {
     let importedCount = 0;
     let skippedCount = 0;
     let errorCount = 0;
+    let warningCount = 0;
     const errors: { row: number; error: string }[] = [];
+    const warnings: { row: number; phone: string; warning: string }[] = [];
     const BATCH_SIZE = 100;
 
     for (let i = 0; i < rows.length; i += BATCH_SIZE) {
       const batch = rows.slice(i, i + BATCH_SIZE);
-      const contacts: Record<string, unknown>[] = [];
+      const contacts: { data: Record<string, unknown>; rowIndex: number; phoneWarnings: string[]; rawPhone: string }[] = [];
 
       for (let j = 0; j < batch.length; j++) {
         const row = batch[j];
@@ -131,7 +133,7 @@ export async function importRoutes(app: FastifyInstance) {
             continue;
           }
 
-          const { phone, isValid } = sanitizePhone(String(rawPhone));
+          const { phone, isValid, warnings: phoneWarnings } = sanitizePhone(String(rawPhone));
 
           const firstName = mapping.first_name ? String(row[mapping.first_name] || "") : "";
           const lastName = mapping.last_name ? String(row[mapping.last_name] || "") : "";
@@ -141,26 +143,31 @@ export async function importRoutes(app: FastifyInstance) {
             : { displayName: "Sem Nome", orgExtracted: undefined };
 
           contacts.push({
-            tenant_id: request.user.tenant_id,
-            first_name: firstName || null,
-            last_name: lastName || null,
-            display_name: displayName,
-            phone,
-            phone_raw: String(rawPhone),
-            email: mapping.email ? String(row[mapping.email] || "") || null : null,
-            organization:
-              (mapping.organization ? String(row[mapping.organization] || "") || null : null) ??
-              orgExtracted ??
-              null,
-            organization_title: mapping.organization_title
-              ? String(row[mapping.organization_title] || "") || null
-              : null,
-            city: mapping.city ? String(row[mapping.city] || "") || null : null,
-            state: mapping.state ? String(row[mapping.state] || "") || null : null,
-            address: mapping.address ? String(row[mapping.address] || "") || null : null,
-            is_valid: isValid,
-            source: "import",
-            import_job_id: job.id,
+            rowIndex,
+            rawPhone: phone,
+            phoneWarnings,
+            data: {
+              tenant_id: request.user.tenant_id,
+              first_name: firstName || null,
+              last_name: lastName || null,
+              display_name: displayName,
+              phone,
+              phone_raw: String(rawPhone),
+              email: mapping.email ? String(row[mapping.email] || "") || null : null,
+              organization:
+                (mapping.organization ? String(row[mapping.organization] || "") || null : null) ??
+                orgExtracted ??
+                null,
+              organization_title: mapping.organization_title
+                ? String(row[mapping.organization_title] || "") || null
+                : null,
+              city: mapping.city ? String(row[mapping.city] || "") || null : null,
+              state: mapping.state ? String(row[mapping.state] || "") || null : null,
+              address: mapping.address ? String(row[mapping.address] || "") || null : null,
+              is_valid: isValid,
+              source: "import",
+              import_job_id: job.id,
+            },
           });
         } catch (err) {
           errorCount++;
@@ -177,20 +184,30 @@ export async function importRoutes(app: FastifyInstance) {
         for (const contact of contacts) {
           const { data: row, error: insertError } = await supabaseAdmin
             .from("contacts")
-            .upsert(contact, { onConflict: "tenant_id,phone" })
+            .upsert(contact.data, { onConflict: "tenant_id,phone" })
             .select("id")
             .single();
 
           if (insertError) {
             errorCount++;
             errors.push({
-              row: i + 2,
-              error: `${contact.phone}: ${insertError.message}`,
+              row: contact.rowIndex,
+              error: `${contact.rawPhone}: ${insertError.message}`,
             });
-            app.log.error({ err: insertError, phone: contact.phone }, "Import insert error");
+            app.log.error({ err: insertError, phone: contact.rawPhone }, "Import insert error");
           } else if (row) {
             importedCount++;
             insertedIds.push(row.id);
+
+            // Collect phone warnings for successfully imported contacts
+            if (contact.phoneWarnings.length > 0) {
+              warningCount++;
+              warnings.push({
+                row: contact.rowIndex,
+                phone: contact.rawPhone,
+                warning: contact.phoneWarnings.join("; "),
+              });
+            }
           }
         }
 
@@ -235,8 +252,10 @@ export async function importRoutes(app: FastifyInstance) {
       imported_count: importedCount,
       skipped_count: skippedCount,
       error_count: errorCount,
+      warning_count: warningCount,
       total_rows: rows.length,
       errors: errors.slice(0, 10),
+      warnings: warnings.slice(0, 50),
     };
   });
 

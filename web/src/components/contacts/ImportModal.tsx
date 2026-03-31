@@ -89,19 +89,39 @@ export default function ImportModal({ open, onClose }: Props) {
         imported_count: number;
         skipped_count: number;
         error_count: number;
+        warning_count: number;
         total_rows: number;
         errors?: { row: number; error: string }[];
+        warnings?: { row: number; phone: string; warning: string }[];
       }>("/import/process", {
         filename: preview.filename,
         column_mapping: mapping,
       });
+
+      // Show main result
       const msg = `Importação: ${result.imported_count} importados, ${result.skipped_count} ignorados, ${result.error_count} erros`;
-      if (result.error_count > 0) {
+      if (result.error_count > 0 && result.imported_count === 0) {
         const errorDetail = result.errors?.[0]?.error || "";
         toast.error(`${msg}\n${errorDetail}`, { duration: 8000 });
+      } else if (result.error_count > 0) {
+        toast(msg, { icon: "⚠️", duration: 5000 });
       } else {
         toast.success(msg, { duration: 4000 });
       }
+
+      // Show phone warnings if any
+      if (result.warning_count && result.warnings?.length) {
+        const dddWarnings = result.warnings.filter((w) => w.warning.includes("DDD"));
+        const digitWarnings = result.warnings.filter((w) => w.warning.includes("dígitos"));
+
+        if (dddWarnings.length > 0) {
+          toast(`${dddWarnings.length} contato(s) sem DDD — verifique: ${dddWarnings.slice(0, 3).map((w) => w.phone).join(", ")}${dddWarnings.length > 3 ? "..." : ""}`, { icon: "⚠️", duration: 10000 });
+        }
+        if (digitWarnings.length > 0) {
+          toast(`${digitWarnings.length} contato(s) com dígitos incorretos — verifique: ${digitWarnings.slice(0, 3).map((w) => w.phone).join(", ")}${digitWarnings.length > 3 ? "..." : ""}`, { icon: "⚠️", duration: 10000 });
+        }
+      }
+
       queryClient.invalidateQueries({ queryKey: ["contacts"] });
       handleReset();
       onClose();
