@@ -13,11 +13,11 @@ export function sanitizeName(raw: string): { displayName: string; orgExtracted?:
   // Remove caracteres especiais do início
   name = name.replace(/^[^a-zA-ZÀ-ú]+/, "");
 
-  // Trim e capitaliza
+  // Trim e capitaliza (primeira letra de cada palavra separada por espaço)
   name = name
     .trim()
     .toLowerCase()
-    .replace(/\b\w/g, (c) => c.toUpperCase());
+    .replace(/(^|\s)\S/g, (c) => c.toUpperCase());
 
   return { displayName: name || "Sem Nome", orgExtracted };
 }
