@@ -12,3 +12,10 @@ Thumbs.db
 *.tsbuildinfo
 dados_sanitizados.xlsx
 *.xlsx
+web/src/**/*.js
+web/src/**/*.js.map
+web/src/**/*.d.ts
+web/src/**/*.d.ts.map
+web/*.d.ts
+web/vite.config.d.ts
+web/tailwind.config.d.ts
