@@ -1,6 +1,9 @@
 import Fastify from "fastify";
 import cors from "@fastify/cors";
 import multipart from "@fastify/multipart";
+import fastifyStatic from "@fastify/static";
+import path from "path";
+import { fileURLToPath } from "url";
 import { env } from "./config/env.js";
 import { authRoutes } from "./modules/auth/routes.js";
 import { contactsRoutes } from "./modules/contacts/routes.js";
@@ -31,6 +34,26 @@ await app.register(adminRoutes, { prefix: "/api/admin" });
 
 // Health check
 app.get("/api/health", async () => ({ status: "ok", timestamp: new Date().toISOString() }));
+
+// Serve frontend static files in production
+if (process.env.NODE_ENV === "production") {
+  const __dirname = path.dirname(fileURLToPath(import.meta.url));
+  const webDist = path.join(__dirname, "../../web/dist");
+
+  await app.register(fastifyStatic, {
+    root: webDist,
+    prefix: "/",
+    wildcard: false,
+  });
+
+  // SPA fallback: serve index.html for non-API routes
+  app.setNotFoundHandler(async (request, reply) => {
+    if (request.url.startsWith("/api")) {
+      return reply.status(404).send({ error: "Not found" });
+    }
+    return reply.sendFile("index.html");
+  });
+}
 
 try {
   await app.listen({ port: env.PORT, host: "0.0.0.0" });
