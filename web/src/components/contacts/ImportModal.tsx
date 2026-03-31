@@ -85,11 +85,21 @@ export default function ImportModal({ open, onClose }: Props) {
     }
 
     try {
-      await api.post("/import/process", {
+      const result = await api.post<{
+        imported_count: number;
+        skipped_count: number;
+        error_count: number;
+        total_rows: number;
+      }>("/import/process", {
         filename: preview.filename,
         column_mapping: mapping,
       });
-      toast.success(`Importação de ${preview.totalRows} contatos iniciada!`);
+      const msg = `Importação concluída: ${result.imported_count} importados, ${result.skipped_count} ignorados, ${result.error_count} erros`;
+      if (result.error_count > 0) {
+        toast(msg, { icon: "⚠️", duration: 5000 });
+      } else {
+        toast.success(msg, { duration: 4000 });
+      }
       queryClient.invalidateQueries({ queryKey: ["contacts"] });
       handleReset();
       onClose();

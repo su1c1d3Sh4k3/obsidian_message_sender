@@ -6,6 +6,20 @@ import { sanitizePhone } from "../../utils/sanitize-phone.js";
 import { sanitizeName } from "../../utils/sanitize-name.js";
 import * as XLSX from "xlsx";
 
+// In-memory store for uploaded file buffers (keyed by filename)
+// Files are cleaned up after processing or after 30 minutes
+const uploadedFiles = new Map<string, { buffer: Buffer; timestamp: number }>();
+
+// Clean up old uploads every 10 minutes
+setInterval(() => {
+  const now = Date.now();
+  for (const [key, value] of uploadedFiles) {
+    if (now - value.timestamp > 30 * 60 * 1000) {
+      uploadedFiles.delete(key);
+    }
+  }
+}, 10 * 60 * 1000);
+
 export async function importRoutes(app: FastifyInstance) {
   app.addHook("onRequest", requireAuth);
 
@@ -20,12 +34,16 @@ export async function importRoutes(app: FastifyInstance) {
     const sheet = workbook.Sheets[sheetName];
     const rows = XLSX.utils.sheet_to_json<Record<string, string>>(sheet);
 
+    // Store buffer in memory for later processing
+    const fileKey = `${request.user.tenant_id}_${Date.now()}_${file.filename}`;
+    uploadedFiles.set(fileKey, { buffer, timestamp: Date.now() });
+
     // Return preview (first 10 rows) + column names
     const columns = rows.length > 0 ? Object.keys(rows[0]) : [];
     const preview = rows.slice(0, 10);
 
     return {
-      filename: file.filename,
+      filename: fileKey,
       totalRows: rows.length,
       columns,
       preview,
@@ -53,6 +71,18 @@ export async function importRoutes(app: FastifyInstance) {
       })
       .parse(request.body);
 
+    // Retrieve stored file buffer
+    const stored = uploadedFiles.get(body.filename);
+    if (!stored) {
+      return reply.status(400).send({ error: "Arquivo expirado. Faça upload novamente." });
+    }
+
+    // Parse the file again
+    const workbook = XLSX.read(stored.buffer, { type: "buffer" });
+    const sheetName = workbook.SheetNames[0];
+    const sheet = workbook.Sheets[sheetName];
+    const rows = XLSX.utils.sheet_to_json<Record<string, string>>(sheet);
+
     // Create import job
     const { data: job, error: jobError } = await supabaseAdmin
       .from("import_jobs")
@@ -61,18 +91,146 @@ export async function importRoutes(app: FastifyInstance) {
         created_by: request.user.id,
         filename: body.filename,
         status: "processing",
+        total_rows: rows.length,
         column_mapping: body.column_mapping,
         auto_tag_id: body.auto_tag_id,
         auto_list_id: body.auto_list_id,
+        started_at: new Date().toISOString(),
       })
       .select()
       .single();
 
     if (jobError) throw jobError;
 
-    // NOTE: In production, this would be handled by a background worker.
-    // For MVP, we process inline but return the job ID immediately.
-    return reply.status(202).send({ job_id: job.id, status: "processing" });
+    // Clean up stored file
+    uploadedFiles.delete(body.filename);
+
+    // Process contacts in batches
+    const mapping = body.column_mapping;
+    let importedCount = 0;
+    let skippedCount = 0;
+    let errorCount = 0;
+    const errors: { row: number; error: string }[] = [];
+    const BATCH_SIZE = 100;
+
+    for (let i = 0; i < rows.length; i += BATCH_SIZE) {
+      const batch = rows.slice(i, i + BATCH_SIZE);
+      const contacts: Record<string, unknown>[] = [];
+
+      for (let j = 0; j < batch.length; j++) {
+        const row = batch[j];
+        const rowIndex = i + j + 2; // +2 for 1-based index + header row
+
+        try {
+          const rawPhone = row[mapping.phone];
+          if (!rawPhone) {
+            skippedCount++;
+            errors.push({ row: rowIndex, error: "Telefone vazio" });
+            continue;
+          }
+
+          const { phone, isValid } = sanitizePhone(String(rawPhone));
+
+          const firstName = mapping.first_name ? String(row[mapping.first_name] || "") : "";
+          const lastName = mapping.last_name ? String(row[mapping.last_name] || "") : "";
+          const nameRaw = [firstName, lastName].filter(Boolean).join(" ");
+          const { displayName, orgExtracted } = nameRaw
+            ? sanitizeName(nameRaw)
+            : { displayName: "Sem Nome", orgExtracted: undefined };
+
+          contacts.push({
+            tenant_id: request.user.tenant_id,
+            first_name: firstName || null,
+            last_name: lastName || null,
+            display_name: displayName,
+            phone,
+            phone_raw: String(rawPhone),
+            email: mapping.email ? String(row[mapping.email] || "") || null : null,
+            organization:
+              (mapping.organization ? String(row[mapping.organization] || "") || null : null) ??
+              orgExtracted ??
+              null,
+            organization_title: mapping.organization_title
+              ? String(row[mapping.organization_title] || "") || null
+              : null,
+            city: mapping.city ? String(row[mapping.city] || "") || null : null,
+            state: mapping.state ? String(row[mapping.state] || "") || null : null,
+            address: mapping.address ? String(row[mapping.address] || "") || null : null,
+            is_valid: isValid,
+            source: "import",
+            import_job_id: job.id,
+          });
+        } catch (err) {
+          errorCount++;
+          errors.push({
+            row: rowIndex,
+            error: err instanceof Error ? err.message : "Erro desconhecido",
+          });
+        }
+      }
+
+      if (contacts.length > 0) {
+        // upsert by (tenant_id, phone) — skip duplicates
+        const { data: inserted, error: insertError } = await supabaseAdmin
+          .from("contacts")
+          .upsert(contacts, { onConflict: "tenant_id,phone", ignoreDuplicates: true })
+          .select("id, phone");
+
+        if (insertError) {
+          errorCount += contacts.length;
+          errors.push({
+            row: i + 2,
+            error: `Erro no lote: ${insertError.message}`,
+          });
+        } else {
+          const insertedCount = inserted?.length ?? 0;
+          importedCount += insertedCount;
+          skippedCount += contacts.length - insertedCount;
+
+          // Auto-tag imported contacts
+          if (body.auto_tag_id && inserted?.length) {
+            await supabaseAdmin
+              .from("contact_tags")
+              .upsert(
+                inserted.map((c) => ({ contact_id: c.id, tag_id: body.auto_tag_id! })),
+                { onConflict: "contact_id,tag_id", ignoreDuplicates: true },
+              );
+          }
+
+          // Auto-add to list
+          if (body.auto_list_id && inserted?.length) {
+            await supabaseAdmin
+              .from("list_contacts")
+              .upsert(
+                inserted.map((c) => ({ list_id: body.auto_list_id!, contact_id: c.id })),
+                { onConflict: "list_id,contact_id", ignoreDuplicates: true },
+              );
+          }
+        }
+      }
+    }
+
+    // Update job status
+    await supabaseAdmin
+      .from("import_jobs")
+      .update({
+        status: errorCount > 0 && importedCount === 0 ? "failed" : "completed",
+        imported_count: importedCount,
+        skipped_count: skippedCount,
+        error_count: errorCount,
+        errors: errors.slice(0, 100), // limit stored errors
+        completed_at: new Date().toISOString(),
+      })
+      .eq("id", job.id);
+
+    return {
+      job_id: job.id,
+      status: "completed",
+      imported_count: importedCount,
+      skipped_count: skippedCount,
+      error_count: errorCount,
+      total_rows: rows.length,
+    };
   });
 
   // GET /api/import/jobs — Lista jobs
