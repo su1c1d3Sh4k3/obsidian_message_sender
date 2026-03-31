@@ -2,12 +2,21 @@ import { supabase } from "./supabase";
 
 const API_URL = "/api";
 
-async function getAuthHeaders(includeContentType = true): Promise<Record<string, string>> {
-  // Try to get current session, refresh if expired
+export async function getAuthHeaders(includeContentType = true): Promise<Record<string, string>> {
+  // Try to get current session
   let { data: { session } } = await supabase.auth.getSession();
 
-  if (!session) {
-    // Session might be expired, try refreshing
+  // Check if token is expired or about to expire (within 60s)
+  if (session?.expires_at) {
+    const expiresAt = session.expires_at * 1000; // convert to ms
+    const now = Date.now();
+    if (now >= expiresAt - 60_000) {
+      // Token expired or expiring soon, refresh
+      const { data } = await supabase.auth.refreshSession();
+      session = data.session;
+    }
+  } else if (!session) {
+    // No session at all, try refreshing
     const { data } = await supabase.auth.refreshSession();
     session = data.session;
   }

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
-import { supabase } from "@/lib/supabase";
+import { getAuthHeaders } from "@/lib/api";
 import toast from "react-hot-toast";
 
 export default function Register() {
@@ -34,15 +34,10 @@ export default function Register() {
     setLoading(true);
 
     try {
-      const { data: { session } } = await supabase.auth.getSession();
+      const headers = await getAuthHeaders(true);
       const res = await fetch("/api/auth/register", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...(session?.access_token
-            ? { Authorization: `Bearer ${session.access_token}` }
-            : {}),
-        },
+        headers,
         body: JSON.stringify({
           name: form.name,
           email: form.email,

@@ -1,7 +1,6 @@
 import { useState, useRef } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/lib/supabase";
-import { api } from "@/lib/api";
+import { api, getAuthHeaders } from "@/lib/api";
 import toast from "react-hot-toast";
 
 interface Props {
@@ -37,12 +36,10 @@ export default function ImportModal({ open, onClose }: Props) {
       const formData = new FormData();
       formData.append("file", file);
 
-      const { data: { session } } = await supabase.auth.getSession();
+      const headers = await getAuthHeaders(false);
       const res = await fetch("/api/import/upload", {
         method: "POST",
-        headers: session?.access_token
-          ? { Authorization: `Bearer ${session.access_token}` }
-          : {},
+        headers,
         body: formData,
       });
 
