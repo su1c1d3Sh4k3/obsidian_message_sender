@@ -81,7 +81,7 @@ CREATE TABLE contacts (
     organization VARCHAR(255),
     organization_title VARCHAR(255),
     city VARCHAR(255),
-    state VARCHAR(10),
+    state VARCHAR(100),
     address TEXT,
     notes TEXT,
     custom_fields JSONB DEFAULT '{}',
