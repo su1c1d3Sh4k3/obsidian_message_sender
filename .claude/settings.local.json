@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(pip install:*)",
+      "Bash(python -c \":*)",
+      "Bash(where python:*)",
+      "Bash(where python3:*)",
+      "Bash(where pip:*)",
+      "Bash(where pip3:*)",
+      "Bash(where node:*)",
+      "Bash(claude mcp:*)",
+      "mcp__stitch__list_projects",
+      "Bash(curl:*)",
+      "Bash(npx supabase:*)"
+    ]
+  }
+}

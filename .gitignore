@@ -1,0 +1,14 @@
+node_modules/
+dist/
+.env
+.env.local
+.env.*.local
+*.log
+.DS_Store
+Thumbs.db
+.vscode/
+!.vscode/settings.json
+.idea/
+*.tsbuildinfo
+dados_sanitizados.xlsx
+*.xlsx
