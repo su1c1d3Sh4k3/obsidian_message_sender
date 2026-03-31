@@ -63,9 +63,19 @@ export async function listsRoutes(app: FastifyInstance) {
   });
 
   // GET /api/lists/:id/contacts
-  app.get("/:id/contacts", async (request) => {
+  app.get("/:id/contacts", async (request, reply) => {
     const { id } = z.object({ id: z.string().uuid() }).parse(request.params);
     const query = z.object({ page: z.coerce.number().default(1), limit: z.coerce.number().default(25) }).parse(request.query);
+
+    // Verify list belongs to user's tenant
+    const { data: list } = await supabaseAdmin
+      .from("lists")
+      .select("id")
+      .eq("id", id)
+      .eq("tenant_id", request.user.tenant_id)
+      .single();
+
+    if (!list) return reply.status(404).send({ error: "Lista não encontrada" });
 
     const from = (query.page - 1) * query.limit;
     const to = from + query.limit - 1;

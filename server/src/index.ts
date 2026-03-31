@@ -4,6 +4,7 @@ import multipart from "@fastify/multipart";
 import fastifyStatic from "@fastify/static";
 import path from "path";
 import { fileURLToPath } from "url";
+import { ZodError } from "zod";
 import { env } from "./config/env.js";
 import { authRoutes } from "./modules/auth/routes.js";
 import { contactsRoutes } from "./modules/contacts/routes.js";
@@ -17,6 +18,20 @@ import { adminRoutes } from "./modules/admin/routes.js";
 import { recoverRunningCampaigns, startScheduleChecker } from "./workers/campaign-dispatcher.js";
 
 const app = Fastify({ logger: true });
+
+// Global error handler — return 400 for validation errors instead of 500
+app.setErrorHandler((error: Error & { statusCode?: number }, _request, reply) => {
+  if (error instanceof ZodError) {
+    return reply.status(400).send({
+      error: "Dados inválidos",
+      details: error.flatten().fieldErrors,
+    });
+  }
+  app.log.error(error);
+  reply.status(error.statusCode ?? 500).send({
+    error: error.message || "Internal Server Error",
+  });
+});
 
 await app.register(cors, { origin: env.CORS_ORIGIN, credentials: true });
 await app.register(multipart, { limits: { fileSize: 52_428_800 } }); // 50MB

@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
+import { supabase } from "@/lib/supabase";
 import toast from "react-hot-toast";
 
 export default function Register() {
@@ -33,9 +34,15 @@ export default function Register() {
     setLoading(true);
 
     try {
+      const { data: { session } } = await supabase.auth.getSession();
       const res = await fetch("/api/auth/register", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(session?.access_token
+            ? { Authorization: `Bearer ${session.access_token}` }
+            : {}),
+        },
         body: JSON.stringify({
           name: form.name,
           email: form.email,

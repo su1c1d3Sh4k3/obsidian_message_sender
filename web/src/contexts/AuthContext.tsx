@@ -26,20 +26,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   async function fetchProfile(authUser: User) {
-    const { data } = await supabase
-      .from("users")
-      .select("id, tenant_id, name, email, role")
-      .eq("id", authUser.id)
-      .single();
+    try {
+      const { data, error } = await supabase
+        .from("users")
+        .select("id, tenant_id, name, email, role")
+        .eq("id", authUser.id)
+        .single();
 
-    setUser(data);
+      if (error || !data) {
+        console.error("Failed to fetch user profile:", error);
+        setUser(null);
+        return;
+      }
+
+      setUser(data);
+    } catch (err) {
+      console.error("Failed to fetch user profile:", err);
+      setUser(null);
+    }
   }
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
       setSession(session);
       if (session?.user) {
-        fetchProfile(session.user);
+        await fetchProfile(session.user);
       }
       setLoading(false);
     });

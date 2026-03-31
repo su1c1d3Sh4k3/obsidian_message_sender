@@ -3,9 +3,14 @@ import { supabase } from "./supabase";
 const API_URL = "/api";
 
 async function getAuthHeaders(includeContentType = true): Promise<Record<string, string>> {
-  const {
-    data: { session },
-  } = await supabase.auth.getSession();
+  // Try to get current session, refresh if expired
+  let { data: { session } } = await supabase.auth.getSession();
+
+  if (!session) {
+    // Session might be expired, try refreshing
+    const { data } = await supabase.auth.refreshSession();
+    session = data.session;
+  }
 
   const headers: Record<string, string> = {};
   if (includeContentType) {
@@ -24,6 +29,29 @@ async function request<T>(path: string, options: RequestInit = {}, includeConten
     ...options,
     headers: { ...headers, ...(options.headers || {}) },
   });
+
+  // If 401, try refreshing token and retry once
+  if (res.status === 401) {
+    const { data } = await supabase.auth.refreshSession();
+    if (data.session) {
+      const retryHeaders: Record<string, string> = {
+        Authorization: `Bearer ${data.session.access_token}`,
+      };
+      if (includeContentType) retryHeaders["Content-Type"] = "application/json";
+
+      const retry = await fetch(`${API_URL}${path}`, {
+        ...options,
+        headers: { ...retryHeaders, ...(options.headers || {}) },
+      });
+
+      if (!retry.ok) {
+        const body = await retry.json().catch(() => ({ error: retry.statusText }));
+        throw new Error(body.error || `Request failed: ${retry.status}`);
+      }
+      if (retry.status === 204) return undefined as T;
+      return retry.json();
+    }
+  }
 
   if (!res.ok) {
     const body = await res.json().catch(() => ({ error: res.statusText }));

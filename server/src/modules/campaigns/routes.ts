@@ -264,8 +264,19 @@ export async function campaignsRoutes(app: FastifyInstance) {
   });
 
   // GET /api/campaigns/:id/messages — Logs de envio
-  app.get("/:id/messages", async (request) => {
+  app.get("/:id/messages", async (request, reply) => {
     const { id } = z.object({ id: z.string().uuid() }).parse(request.params);
+
+    // Verify campaign belongs to user's tenant
+    const { data: campaign } = await supabaseAdmin
+      .from("campaigns")
+      .select("id")
+      .eq("id", id)
+      .eq("tenant_id", request.user.tenant_id)
+      .single();
+
+    if (!campaign) return reply.status(404).send({ error: "Campanha não encontrada" });
+
     const query = z
       .object({
         status: z.string().optional(),

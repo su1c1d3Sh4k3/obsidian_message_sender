@@ -80,18 +80,22 @@ export async function contactsRoutes(app: FastifyInstance) {
 
   // POST /api/contacts — Criar contato
   app.post("/", async (request, reply) => {
+    const emptyToUndefined = z.literal("").transform(() => undefined);
+    const optionalString = z.string().optional().or(emptyToUndefined);
+    const optionalEmail = z.string().email().optional().or(emptyToUndefined);
+
     const body = z
       .object({
-        first_name: z.string().optional(),
-        last_name: z.string().optional(),
+        first_name: optionalString,
+        last_name: optionalString,
         phone: z.string(),
-        email: z.string().email().optional(),
-        organization: z.string().optional(),
-        organization_title: z.string().optional(),
-        city: z.string().optional(),
-        state: z.string().optional(),
-        address: z.string().optional(),
-        notes: z.string().optional(),
+        email: optionalEmail,
+        organization: optionalString,
+        organization_title: optionalString,
+        city: optionalString,
+        state: optionalString,
+        address: optionalString,
+        notes: optionalString,
         tag_ids: z.array(z.string().uuid()).optional(),
       })
       .parse(request.body);
@@ -143,18 +147,22 @@ export async function contactsRoutes(app: FastifyInstance) {
   // PUT /api/contacts/:id
   app.put("/:id", async (request, reply) => {
     const { id } = z.object({ id: z.string().uuid() }).parse(request.params);
+    const emptyToNull = z.literal("").transform(() => null);
+    const nullableString = z.string().nullable().optional().or(emptyToNull);
+    const nullableEmail = z.string().email().nullable().optional().or(emptyToNull);
+
     const body = z
       .object({
-        first_name: z.string().optional(),
-        last_name: z.string().optional(),
+        first_name: z.string().optional().or(z.literal("").transform(() => undefined)),
+        last_name: z.string().optional().or(z.literal("").transform(() => undefined)),
         phone: z.string().optional(),
-        email: z.string().email().nullable().optional(),
-        organization: z.string().nullable().optional(),
-        organization_title: z.string().nullable().optional(),
-        city: z.string().nullable().optional(),
-        state: z.string().nullable().optional(),
-        address: z.string().nullable().optional(),
-        notes: z.string().nullable().optional(),
+        email: nullableEmail,
+        organization: nullableString,
+        organization_title: nullableString,
+        city: nullableString,
+        state: nullableString,
+        address: nullableString,
+        notes: nullableString,
       })
       .parse(request.body);
 
