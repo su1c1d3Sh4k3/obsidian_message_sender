@@ -90,13 +90,15 @@ export default function ImportModal({ open, onClose }: Props) {
         skipped_count: number;
         error_count: number;
         total_rows: number;
+        errors?: { row: number; error: string }[];
       }>("/import/process", {
         filename: preview.filename,
         column_mapping: mapping,
       });
-      const msg = `Importação concluída: ${result.imported_count} importados, ${result.skipped_count} ignorados, ${result.error_count} erros`;
+      const msg = `Importação: ${result.imported_count} importados, ${result.skipped_count} ignorados, ${result.error_count} erros`;
       if (result.error_count > 0) {
-        toast(msg, { icon: "⚠️", duration: 5000 });
+        const errorDetail = result.errors?.[0]?.error || "";
+        toast.error(`${msg}\n${errorDetail}`, { duration: 8000 });
       } else {
         toast.success(msg, { duration: 4000 });
       }

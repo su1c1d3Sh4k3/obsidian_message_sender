@@ -83,6 +83,8 @@ export async function importRoutes(app: FastifyInstance) {
     const sheet = workbook.Sheets[sheetName];
     const rows = XLSX.utils.sheet_to_json<Record<string, string>>(sheet);
 
+    app.log.info({ totalRows: rows.length, columns: rows[0] ? Object.keys(rows[0]) : [], mapping: body.column_mapping, firstRow: rows[0] }, "Import process started");
+
     // Create import job
     const { data: job, error: jobError } = await supabaseAdmin
       .from("import_jobs")
@@ -170,42 +172,46 @@ export async function importRoutes(app: FastifyInstance) {
       }
 
       if (contacts.length > 0) {
-        // upsert by (tenant_id, phone) — skip duplicates
-        const { data: inserted, error: insertError } = await supabaseAdmin
-          .from("contacts")
-          .upsert(contacts, { onConflict: "tenant_id,phone", ignoreDuplicates: true })
-          .select("id, phone");
+        // Insert contacts one-by-one to handle duplicates gracefully
+        const insertedIds: string[] = [];
+        for (const contact of contacts) {
+          const { data: row, error: insertError } = await supabaseAdmin
+            .from("contacts")
+            .upsert(contact, { onConflict: "tenant_id,phone" })
+            .select("id")
+            .single();
 
-        if (insertError) {
-          errorCount += contacts.length;
-          errors.push({
-            row: i + 2,
-            error: `Erro no lote: ${insertError.message}`,
-          });
-        } else {
-          const insertedCount = inserted?.length ?? 0;
-          importedCount += insertedCount;
-          skippedCount += contacts.length - insertedCount;
-
-          // Auto-tag imported contacts
-          if (body.auto_tag_id && inserted?.length) {
-            await supabaseAdmin
-              .from("contact_tags")
-              .upsert(
-                inserted.map((c) => ({ contact_id: c.id, tag_id: body.auto_tag_id! })),
-                { onConflict: "contact_id,tag_id", ignoreDuplicates: true },
-              );
+          if (insertError) {
+            errorCount++;
+            errors.push({
+              row: i + 2,
+              error: `${contact.phone}: ${insertError.message}`,
+            });
+            app.log.error({ err: insertError, phone: contact.phone }, "Import insert error");
+          } else if (row) {
+            importedCount++;
+            insertedIds.push(row.id);
           }
+        }
 
-          // Auto-add to list
-          if (body.auto_list_id && inserted?.length) {
-            await supabaseAdmin
-              .from("list_contacts")
-              .upsert(
-                inserted.map((c) => ({ list_id: body.auto_list_id!, contact_id: c.id })),
-                { onConflict: "list_id,contact_id", ignoreDuplicates: true },
-              );
-          }
+        // Auto-tag imported contacts
+        if (body.auto_tag_id && insertedIds.length) {
+          await supabaseAdmin
+            .from("contact_tags")
+            .upsert(
+              insertedIds.map((id) => ({ contact_id: id, tag_id: body.auto_tag_id! })),
+              { onConflict: "contact_id,tag_id", ignoreDuplicates: true },
+            );
+        }
+
+        // Auto-add to list
+        if (body.auto_list_id && insertedIds.length) {
+          await supabaseAdmin
+            .from("list_contacts")
+            .upsert(
+              insertedIds.map((id) => ({ list_id: body.auto_list_id!, contact_id: id })),
+              { onConflict: "list_id,contact_id", ignoreDuplicates: true },
+            );
         }
       }
     }
@@ -225,11 +231,12 @@ export async function importRoutes(app: FastifyInstance) {
 
     return {
       job_id: job.id,
-      status: "completed",
+      status: errorCount > 0 && importedCount === 0 ? "failed" : "completed",
       imported_count: importedCount,
       skipped_count: skippedCount,
       error_count: errorCount,
       total_rows: rows.length,
+      errors: errors.slice(0, 10),
     };
   });
 
