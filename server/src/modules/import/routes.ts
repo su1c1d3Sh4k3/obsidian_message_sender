@@ -65,6 +65,7 @@ export async function importRoutes(app: FastifyInstance) {
           city: z.string().optional(),
           state: z.string().optional(),
           city_state: z.string().optional(),
+          tag: z.string().optional(),
           address: z.string().optional(),
         }),
         auto_tag_id: z.string().uuid().optional(),
@@ -118,9 +119,25 @@ export async function importRoutes(app: FastifyInstance) {
     const warnings: { row: number; phone: string; warning: string }[] = [];
     const BATCH_SIZE = 100;
 
+    // Cache for tag name → tag id (to avoid creating duplicates)
+    const tagCache = new Map<string, string>();
+
+    // Pre-load existing tags for this tenant
+    if (mapping.tag) {
+      const { data: existingTags } = await supabaseAdmin
+        .from("tags")
+        .select("id, name")
+        .eq("tenant_id", request.user.tenant_id);
+      if (existingTags) {
+        for (const t of existingTags) {
+          tagCache.set(t.name.toLowerCase().trim(), t.id);
+        }
+      }
+    }
+
     for (let i = 0; i < rows.length; i += BATCH_SIZE) {
       const batch = rows.slice(i, i + BATCH_SIZE);
-      const contacts: { data: Record<string, unknown>; rowIndex: number; phoneWarnings: string[]; rawPhone: string }[] = [];
+      const contacts: { data: Record<string, unknown>; rowIndex: number; phoneWarnings: string[]; rawPhone: string; tagName?: string }[] = [];
 
       for (let j = 0; j < batch.length; j++) {
         const row = batch[j];
@@ -173,6 +190,7 @@ export async function importRoutes(app: FastifyInstance) {
               source: "import",
               import_job_id: job.id,
             },
+            tagName: mapping.tag ? String(row[mapping.tag] || "").trim() || undefined : undefined,
           });
         } catch (err) {
           errorCount++;
@@ -203,6 +221,31 @@ export async function importRoutes(app: FastifyInstance) {
           } else if (row) {
             importedCount++;
             insertedIds.push(row.id);
+
+            // Assign tag from spreadsheet column
+            if (contact.tagName) {
+              const tagKey = contact.tagName.toLowerCase();
+              let tagId = tagCache.get(tagKey);
+
+              // Create tag if it doesn't exist
+              if (!tagId) {
+                const { data: newTag } = await supabaseAdmin
+                  .from("tags")
+                  .insert({ tenant_id: request.user.tenant_id, name: contact.tagName, color: "#3B82F6" })
+                  .select("id")
+                  .single();
+                if (newTag) {
+                  tagId = newTag.id;
+                  tagCache.set(tagKey, tagId!);
+                }
+              }
+
+              if (tagId) {
+                await supabaseAdmin
+                  .from("contact_tags")
+                  .upsert({ contact_id: row.id, tag_id: tagId }, { onConflict: "contact_id,tag_id", ignoreDuplicates: true });
+              }
+            }
 
             // Collect phone warnings for successfully imported contacts
             if (contact.phoneWarnings.length > 0) {

@@ -26,6 +26,7 @@ export default function ImportModal({ open, onClose }: Props) {
     { key: "first_name", label: "Primeiro Nome" },
     { key: "phone", label: "Número" },
     { key: "organization", label: "Empresa" },
+    { key: "tag", label: "Tag" },
     { key: "city_state", label: "Cidade/Estado" },
     { key: "city", label: "Cidade (separado)" },
     { key: "state", label: "Estado (separado)" },
@@ -64,6 +65,9 @@ export default function ImportModal({ open, onClose }: Props) {
       }
       if (colLower.some((c) => c.includes("empresa") || c.includes("organization"))) {
         autoMap.organization = data.columns[colLower.findIndex((c) => c.includes("empresa") || c.includes("organization"))];
+      }
+      if (colLower.some((c) => c === "tag" || c === "tags" || c.includes("etiqueta"))) {
+        autoMap.tag = data.columns[colLower.findIndex((c) => c === "tag" || c === "tags" || c.includes("etiqueta"))];
       }
       // Detect combined "Cidade/Estado" column
       const cityStateIdx = colLower.findIndex((c) => c.includes("cidade") && c.includes("estado"));
