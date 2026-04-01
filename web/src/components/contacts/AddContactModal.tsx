@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
+import { applyDateMask } from "@/utils/date-mask";
 import toast from "react-hot-toast";
 
 interface Tag {
@@ -209,7 +210,7 @@ export default function AddContactModal({ open, onClose }: Props) {
 
           <div className="space-y-2">
             <label className="text-xs font-semibold uppercase tracking-wider text-secondary">Data de Nascimento</label>
-            <input value={form.birth_date} onChange={(e) => update("birth_date", e.target.value)} className="w-full bg-background border border-outline-variant rounded px-4 py-2.5 focus:ring-2 focus:ring-primary focus:border-transparent text-sm outline-none text-on-surface" placeholder="DD/MM/AAAA" maxLength={10} />
+            <input value={form.birth_date} onChange={(e) => update("birth_date", applyDateMask(e.target.value))} className="w-full bg-background border border-outline-variant rounded px-4 py-2.5 focus:ring-2 focus:ring-primary focus:border-transparent text-sm outline-none text-on-surface" placeholder="DD/MM/AAAA" maxLength={10} />
           </div>
 
           <div className="space-y-2">

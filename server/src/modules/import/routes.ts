@@ -188,7 +188,7 @@ export async function importRoutes(app: FastifyInstance) {
                 ? (String(row[mapping.city_state] || "").split("/")[1]?.trim() || null)
                 : (mapping.state ? String(row[mapping.state] || "") || null : null),
               address: mapping.address ? String(row[mapping.address] || "") || null : null,
-              birth_date: mapping.birth_date ? normalizeBirthDate(row[mapping.birth_date]) : null,
+              ...(mapping.birth_date ? { birth_date: normalizeBirthDate(row[mapping.birth_date]) } : {}),
               is_valid: isValid,
               source: "import",
               import_job_id: job.id,

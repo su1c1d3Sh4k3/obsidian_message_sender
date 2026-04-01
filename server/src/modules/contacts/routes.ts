@@ -107,9 +107,8 @@ export async function contactsRoutes(app: FastifyInstance) {
       ? sanitizeName([body.first_name, body.last_name].filter(Boolean).join(" ")).displayName
       : "Sem Nome";
 
-    const { data, error } = await supabaseAdmin
-      .from("contacts")
-      .insert({
+    const normalizedBirthDate = normalizeBirthDate(body.birth_date);
+    const insertData: Record<string, unknown> = {
         tenant_id: request.user.tenant_id,
         first_name: body.first_name,
         last_name: body.last_name,
@@ -122,11 +121,17 @@ export async function contactsRoutes(app: FastifyInstance) {
         city: body.city,
         state: body.state,
         address: body.address,
-        birth_date: normalizeBirthDate(body.birth_date),
         notes: body.notes,
         is_valid: isValid,
         source: "manual",
-      })
+    };
+    if (normalizedBirthDate !== null) {
+      insertData.birth_date = normalizedBirthDate;
+    }
+
+    const { data, error } = await supabaseAdmin
+      .from("contacts")
+      .insert(insertData)
       .select()
       .single();
 
@@ -170,10 +175,12 @@ export async function contactsRoutes(app: FastifyInstance) {
       })
       .parse(request.body);
 
-    const update: Record<string, unknown> = { ...body };
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { birth_date: rawBirthDate, ...rest } = body;
+    const update: Record<string, unknown> = { ...rest };
 
-    if (body.birth_date !== undefined) {
-      update.birth_date = body.birth_date ? normalizeBirthDate(body.birth_date) : null;
+    if (rawBirthDate !== undefined) {
+      update.birth_date = rawBirthDate ? normalizeBirthDate(rawBirthDate) : null;
     }
 
     if (body.phone) {
