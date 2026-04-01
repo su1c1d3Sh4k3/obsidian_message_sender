@@ -4,6 +4,7 @@ import { supabaseAdmin } from "../../lib/supabase.js";
 import { requireAuth } from "../../middleware/auth.js";
 import { sanitizePhone } from "../../utils/sanitize-phone.js";
 import { sanitizeName } from "../../utils/sanitize-name.js";
+import { normalizeBirthDate } from "../../utils/normalize-date.js";
 
 export async function contactsRoutes(app: FastifyInstance) {
   app.addHook("onRequest", requireAuth);
@@ -95,6 +96,7 @@ export async function contactsRoutes(app: FastifyInstance) {
         city: optionalString,
         state: optionalString,
         address: optionalString,
+        birth_date: optionalString,
         notes: optionalString,
         tag_ids: z.array(z.string().uuid()).optional(),
       })
@@ -120,6 +122,7 @@ export async function contactsRoutes(app: FastifyInstance) {
         city: body.city,
         state: body.state,
         address: body.address,
+        birth_date: normalizeBirthDate(body.birth_date),
         notes: body.notes,
         is_valid: isValid,
         source: "manual",
@@ -162,11 +165,16 @@ export async function contactsRoutes(app: FastifyInstance) {
         city: nullableString,
         state: nullableString,
         address: nullableString,
+        birth_date: nullableString,
         notes: nullableString,
       })
       .parse(request.body);
 
     const update: Record<string, unknown> = { ...body };
+
+    if (body.birth_date !== undefined) {
+      update.birth_date = body.birth_date ? normalizeBirthDate(body.birth_date) : null;
+    }
 
     if (body.phone) {
       const { phone, isValid } = sanitizePhone(body.phone);

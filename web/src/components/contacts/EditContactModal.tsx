@@ -19,6 +19,7 @@ interface Contact {
   city: string | null;
   state: string | null;
   organization: string | null;
+  birth_date?: string | null;
   notes?: string | null;
   contact_tags?: Array<{ tags: Tag }>;
 }
@@ -39,6 +40,7 @@ export default function EditContactModal({ open, onClose, contact }: Props) {
     organization: "",
     city: "",
     state: "",
+    birth_date: "",
     notes: "",
   });
   const [selectedTagIds, setSelectedTagIds] = useState<string[]>([]);
@@ -54,6 +56,13 @@ export default function EditContactModal({ open, onClose, contact }: Props) {
   // Populate form when contact changes
   useEffect(() => {
     if (contact) {
+      // Format birth_date from YYYY-MM-DD to DD/MM/YYYY for display
+      let birthDateDisplay = "";
+      if (contact.birth_date) {
+        const match = contact.birth_date.match(/^(\d{4})-(\d{2})-(\d{2})/);
+        if (match) birthDateDisplay = `${match[3]}/${match[2]}/${match[1]}`;
+        else birthDateDisplay = contact.birth_date;
+      }
       setForm({
         first_name: contact.first_name ?? "",
         last_name: contact.last_name ?? "",
@@ -62,6 +71,7 @@ export default function EditContactModal({ open, onClose, contact }: Props) {
         organization: contact.organization ?? "",
         city: contact.city ?? "",
         state: contact.state ?? "",
+        birth_date: birthDateDisplay,
         notes: contact.notes ?? "",
       });
       setSelectedTagIds(contact.contact_tags?.map((ct) => ct.tags.id) ?? []);
@@ -216,6 +226,11 @@ export default function EditContactModal({ open, onClose, contact }: Props) {
               <label className="text-xs font-semibold uppercase tracking-wider text-secondary">Estado</label>
               <input value={form.state} onChange={(e) => update("state", e.target.value)} className="w-full bg-background border border-outline-variant rounded px-4 py-2.5 focus:ring-2 focus:ring-primary focus:border-transparent text-sm outline-none text-on-surface" placeholder="MG" maxLength={2} />
             </div>
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-xs font-semibold uppercase tracking-wider text-secondary">Data de Nascimento</label>
+            <input value={form.birth_date} onChange={(e) => update("birth_date", e.target.value)} className="w-full bg-background border border-outline-variant rounded px-4 py-2.5 focus:ring-2 focus:ring-primary focus:border-transparent text-sm outline-none text-on-surface" placeholder="DD/MM/AAAA" maxLength={10} />
           </div>
 
           <div className="space-y-2">

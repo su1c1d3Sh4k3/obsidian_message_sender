@@ -6,6 +6,7 @@ const navItems = [
   { path: "/contacts", icon: "person_add", label: "Contatos" },
   { path: "/groups", icon: "folder_shared", label: "Grupos" },
   { path: "/campaigns", icon: "campaign", label: "Campanhas" },
+  { path: "/birthdays", icon: "cake", label: "Aniversários" },
   { path: "/schedule", icon: "calendar_month", label: "Agendamentos" },
   { path: "/senders", icon: "phone_android", label: "Remetentes" },
   { path: "/settings", icon: "settings", label: "Configurações" },

@@ -10,6 +10,7 @@ import Schedule from "@/pages/Schedule";
 import Senders from "@/pages/Senders";
 import Settings from "@/pages/Settings";
 import Admin from "@/pages/Admin";
+import Birthdays from "@/pages/Birthdays";
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
@@ -41,6 +42,7 @@ export default function App() {
                 <Route path="/contacts" element={<Contacts />} />
                 <Route path="/groups" element={<Groups />} />
                 <Route path="/campaigns" element={<Campaigns />} />
+                <Route path="/birthdays" element={<Birthdays />} />
                 <Route path="/schedule" element={<Schedule />} />
                 <Route path="/senders" element={<Senders />} />
                 <Route path="/settings" element={<Settings />} />

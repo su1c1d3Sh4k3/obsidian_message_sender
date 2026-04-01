@@ -24,6 +24,7 @@ export default function AddContactModal({ open, onClose }: Props) {
     organization: "",
     city: "",
     state: "",
+    birth_date: "",
     notes: "",
   });
   const [selectedTagIds, setSelectedTagIds] = useState<string[]>([]);
@@ -78,7 +79,7 @@ export default function AddContactModal({ open, onClose }: Props) {
   });
 
   function resetForm() {
-    setForm({ first_name: "", last_name: "", phone: "", email: "", organization: "", city: "", state: "", notes: "" });
+    setForm({ first_name: "", last_name: "", phone: "", email: "", organization: "", city: "", state: "", birth_date: "", notes: "" });
     setSelectedTagIds([]);
     setNewTagName("");
     setCreatingTag(false);
@@ -204,6 +205,11 @@ export default function AddContactModal({ open, onClose }: Props) {
               <label className="text-xs font-semibold uppercase tracking-wider text-secondary">Estado</label>
               <input value={form.state} onChange={(e) => update("state", e.target.value)} className="w-full bg-background border border-outline-variant rounded px-4 py-2.5 focus:ring-2 focus:ring-primary focus:border-transparent text-sm outline-none text-on-surface" placeholder="MG" maxLength={2} />
             </div>
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-xs font-semibold uppercase tracking-wider text-secondary">Data de Nascimento</label>
+            <input value={form.birth_date} onChange={(e) => update("birth_date", e.target.value)} className="w-full bg-background border border-outline-variant rounded px-4 py-2.5 focus:ring-2 focus:ring-primary focus:border-transparent text-sm outline-none text-on-surface" placeholder="DD/MM/AAAA" maxLength={10} />
           </div>
 
           <div className="space-y-2">

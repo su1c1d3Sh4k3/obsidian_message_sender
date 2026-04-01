@@ -15,7 +15,9 @@ import { campaignsRoutes } from "./modules/campaigns/routes.js";
 import { importRoutes } from "./modules/import/routes.js";
 import { settingsRoutes } from "./modules/settings/routes.js";
 import { adminRoutes } from "./modules/admin/routes.js";
+import { birthdayRoutes } from "./modules/campaigns/birthday-routes.js";
 import { recoverRunningCampaigns, startScheduleChecker } from "./workers/campaign-dispatcher.js";
+import { startBirthdayChecker } from "./workers/birthday-dispatcher.js";
 
 const app = Fastify({ logger: true });
 
@@ -44,6 +46,7 @@ await app.register(listsRoutes, { prefix: "/api/lists" });
 await app.register(sendersRoutes, { prefix: "/api/senders" });
 await app.register(campaignsRoutes, { prefix: "/api/campaigns" });
 await app.register(importRoutes, { prefix: "/api/import" });
+await app.register(birthdayRoutes, { prefix: "/api/birthdays" });
 await app.register(settingsRoutes, { prefix: "/api/settings" });
 await app.register(adminRoutes, { prefix: "/api/admin" });
 
@@ -81,6 +84,9 @@ try {
 
   // Start scheduled campaign checker
   startScheduleChecker();
+
+  // Start birthday campaign checker
+  startBirthdayChecker();
 } catch (err) {
   app.log.error(err);
   process.exit(1);

@@ -1,7 +1,7 @@
 import { jsx as _jsx, jsxs as _jsxs, Fragment as _Fragment } from "react/jsx-runtime";
 import { useState, useRef } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { api } from "@/lib/api";
+import { api, getAuthHeaders } from "@/lib/api";
 import toast from "react-hot-toast";
 export default function ImportModal({ open, onClose }) {
     const queryClient = useQueryClient();
@@ -13,16 +13,20 @@ export default function ImportModal({ open, onClose }) {
         { key: "first_name", label: "Primeiro Nome" },
         { key: "phone", label: "Número" },
         { key: "organization", label: "Empresa" },
-        { key: "city", label: "Cidade" },
-        { key: "state", label: "Estado" },
+        { key: "tag", label: "Tag" },
+        { key: "city_state", label: "Cidade/Estado" },
+        { key: "city", label: "Cidade (separado)" },
+        { key: "state", label: "Estado (separado)" },
     ];
     async function handleUpload(file) {
         setUploading(true);
         try {
             const formData = new FormData();
             formData.append("file", file);
+            const headers = await getAuthHeaders(false);
             const res = await fetch("/api/import/upload", {
                 method: "POST",
+                headers,
                 body: formData,
             });
             const text = await res.text();
@@ -46,11 +50,21 @@ export default function ImportModal({ open, onClose }) {
             if (colLower.some((c) => c.includes("empresa") || c.includes("organization"))) {
                 autoMap.organization = data.columns[colLower.findIndex((c) => c.includes("empresa") || c.includes("organization"))];
             }
-            if (colLower.some((c) => c.includes("cidade"))) {
-                autoMap.city = data.columns[colLower.findIndex((c) => c.includes("cidade"))];
+            if (colLower.some((c) => c === "tag" || c === "tags" || c.includes("etiqueta"))) {
+                autoMap.tag = data.columns[colLower.findIndex((c) => c === "tag" || c === "tags" || c.includes("etiqueta"))];
             }
-            if (colLower.some((c) => c.includes("estado"))) {
-                autoMap.state = data.columns[colLower.findIndex((c) => c.includes("estado"))];
+            // Detect combined "Cidade/Estado" column
+            const cityStateIdx = colLower.findIndex((c) => c.includes("cidade") && c.includes("estado"));
+            if (cityStateIdx >= 0) {
+                autoMap.city_state = data.columns[cityStateIdx];
+            }
+            else {
+                if (colLower.some((c) => c.includes("cidade"))) {
+                    autoMap.city = data.columns[colLower.findIndex((c) => c.includes("cidade"))];
+                }
+                if (colLower.some((c) => c.includes("estado"))) {
+                    autoMap.state = data.columns[colLower.findIndex((c) => c.includes("estado"))];
+                }
             }
             setMapping(autoMap);
         }
@@ -67,11 +81,33 @@ export default function ImportModal({ open, onClose }) {
             return;
         }
         try {
-            await api.post("/import/process", {
+            const result = await api.post("/import/process", {
                 filename: preview.filename,
                 column_mapping: mapping,
             });
-            toast.success(`Importação de ${preview.totalRows} contatos iniciada!`);
+            // Show main result
+            const msg = `Importação: ${result.imported_count} importados, ${result.skipped_count} ignorados, ${result.error_count} erros`;
+            if (result.error_count > 0 && result.imported_count === 0) {
+                const errorDetail = result.errors?.[0]?.error || "";
+                toast.error(`${msg}\n${errorDetail}`, { duration: 8000 });
+            }
+            else if (result.error_count > 0) {
+                toast(msg, { icon: "⚠️", duration: 5000 });
+            }
+            else {
+                toast.success(msg, { duration: 4000 });
+            }
+            // Show phone warnings if any
+            if (result.warning_count && result.warnings?.length) {
+                const dddWarnings = result.warnings.filter((w) => w.warning.includes("DDD"));
+                const digitWarnings = result.warnings.filter((w) => w.warning.includes("dígitos"));
+                if (dddWarnings.length > 0) {
+                    toast(`${dddWarnings.length} contato(s) sem DDD — verifique: ${dddWarnings.slice(0, 3).map((w) => w.phone).join(", ")}${dddWarnings.length > 3 ? "..." : ""}`, { icon: "⚠️", duration: 10000 });
+                }
+                if (digitWarnings.length > 0) {
+                    toast(`${digitWarnings.length} contato(s) com dígitos incorretos — verifique: ${digitWarnings.slice(0, 3).map((w) => w.phone).join(", ")}${digitWarnings.length > 3 ? "..." : ""}`, { icon: "⚠️", duration: 10000 });
+                }
+            }
             queryClient.invalidateQueries({ queryKey: ["contacts"] });
             handleReset();
             onClose();

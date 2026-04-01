@@ -83,6 +83,7 @@ CREATE TABLE contacts (
     city VARCHAR(255),
     state VARCHAR(100),
     address TEXT,
+    birth_date DATE,
     notes TEXT,
     custom_fields JSONB DEFAULT '{}',
     is_valid BOOLEAN DEFAULT true,
@@ -98,6 +99,7 @@ CREATE INDEX idx_contacts_tenant ON contacts(tenant_id);
 CREATE INDEX idx_contacts_phone ON contacts(tenant_id, phone);
 CREATE INDEX idx_contacts_city ON contacts(tenant_id, city);
 CREATE INDEX idx_contacts_blacklisted ON contacts(tenant_id, is_blacklisted) WHERE is_blacklisted = true;
+CREATE INDEX idx_contacts_birth_date ON contacts(tenant_id, birth_date) WHERE birth_date IS NOT NULL;
 
 -- 7. CONTACT_TAGS (N:N)
 CREATE TABLE contact_tags (
@@ -190,7 +192,34 @@ CREATE INDEX idx_cm_campaign ON campaign_messages(campaign_id);
 CREATE INDEX idx_cm_status ON campaign_messages(campaign_id, status);
 CREATE INDEX idx_cm_contact ON campaign_messages(contact_id);
 
--- 12. BLACKLIST (LGPD)
+-- 12. BIRTHDAY_CAMPAIGNS (1 ativa por tenant)
+CREATE TABLE birthday_campaigns (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+    created_by UUID REFERENCES users(id),
+    name VARCHAR(255) NOT NULL,
+    is_active BOOLEAN DEFAULT false,
+    message_type VARCHAR(20) DEFAULT 'text',
+    message_body TEXT NOT NULL,
+    media_url TEXT,
+    media_filename VARCHAR(255),
+    media_caption TEXT,
+    sender_id UUID REFERENCES senders(id),
+    sender_ids UUID[],
+    delay_min INT DEFAULT 15,
+    delay_max INT DEFAULT 45,
+    use_spintax BOOLEAN DEFAULT false,
+    send_time TIME NOT NULL DEFAULT '09:00',
+    total_sent INT DEFAULT 0,
+    last_run_date DATE,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Only one active birthday campaign per tenant
+CREATE UNIQUE INDEX idx_birthday_campaigns_active ON birthday_campaigns(tenant_id) WHERE is_active = true;
+
+-- 13. BLACKLIST (LGPD)
 CREATE TABLE blacklist (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
@@ -223,6 +252,7 @@ ALTER TABLE senders ENABLE ROW LEVEL SECURITY;
 ALTER TABLE campaigns ENABLE ROW LEVEL SECURITY;
 ALTER TABLE campaign_messages ENABLE ROW LEVEL SECURITY;
 ALTER TABLE blacklist ENABLE ROW LEVEL SECURITY;
+ALTER TABLE birthday_campaigns ENABLE ROW LEVEL SECURITY;
 ALTER TABLE import_jobs ENABLE ROW LEVEL SECURITY;
 
 -- RLS Policies: tenant isolation
@@ -253,6 +283,9 @@ CREATE POLICY "tenant_isolation" ON campaign_messages
     ));
 
 CREATE POLICY "tenant_isolation" ON blacklist
+    FOR ALL USING (tenant_id = public.get_tenant_id());
+
+CREATE POLICY "tenant_isolation" ON birthday_campaigns
     FOR ALL USING (tenant_id = public.get_tenant_id());
 
 CREATE POLICY "tenant_isolation" ON import_jobs
@@ -286,3 +319,4 @@ CREATE TRIGGER set_updated_at BEFORE UPDATE ON contacts FOR EACH ROW EXECUTE FUN
 CREATE TRIGGER set_updated_at BEFORE UPDATE ON lists FOR EACH ROW EXECUTE FUNCTION update_updated_at();
 CREATE TRIGGER set_updated_at BEFORE UPDATE ON senders FOR EACH ROW EXECUTE FUNCTION update_updated_at();
 CREATE TRIGGER set_updated_at BEFORE UPDATE ON campaigns FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+CREATE TRIGGER set_updated_at BEFORE UPDATE ON birthday_campaigns FOR EACH ROW EXECUTE FUNCTION update_updated_at();

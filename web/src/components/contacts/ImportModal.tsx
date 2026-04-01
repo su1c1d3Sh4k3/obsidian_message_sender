@@ -30,6 +30,7 @@ export default function ImportModal({ open, onClose }: Props) {
     { key: "city_state", label: "Cidade/Estado" },
     { key: "city", label: "Cidade (separado)" },
     { key: "state", label: "Estado (separado)" },
+    { key: "birth_date", label: "Data de Nascimento" },
   ];
 
   async function handleUpload(file: File) {
@@ -80,6 +81,9 @@ export default function ImportModal({ open, onClose }: Props) {
         if (colLower.some((c) => c.includes("estado"))) {
           autoMap.state = data.columns[colLower.findIndex((c) => c.includes("estado"))];
         }
+      }
+      if (colLower.some((c) => c.includes("nascimento") || c.includes("aniversário") || c.includes("aniversario") || c.includes("birthday") || c.includes("birth"))) {
+        autoMap.birth_date = data.columns[colLower.findIndex((c) => c.includes("nascimento") || c.includes("aniversário") || c.includes("aniversario") || c.includes("birthday") || c.includes("birth"))];
       }
       setMapping(autoMap);
     } catch (err) {

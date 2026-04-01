@@ -4,6 +4,7 @@ import { supabaseAdmin } from "../../lib/supabase.js";
 import { requireAuth } from "../../middleware/auth.js";
 import { sanitizePhone } from "../../utils/sanitize-phone.js";
 import { sanitizeName } from "../../utils/sanitize-name.js";
+import { normalizeBirthDate } from "../../utils/normalize-date.js";
 import * as XLSX from "xlsx";
 
 // In-memory store for uploaded file buffers (keyed by filename)
@@ -67,6 +68,7 @@ export async function importRoutes(app: FastifyInstance) {
           city_state: z.string().optional(),
           tag: z.string().optional(),
           address: z.string().optional(),
+          birth_date: z.string().optional(),
         }),
         auto_tag_id: z.string().uuid().optional(),
         auto_list_id: z.string().uuid().optional(),
@@ -186,6 +188,7 @@ export async function importRoutes(app: FastifyInstance) {
                 ? (String(row[mapping.city_state] || "").split("/")[1]?.trim() || null)
                 : (mapping.state ? String(row[mapping.state] || "") || null : null),
               address: mapping.address ? String(row[mapping.address] || "") || null : null,
+              birth_date: mapping.birth_date ? normalizeBirthDate(row[mapping.birth_date]) : null,
               is_valid: isValid,
               source: "import",
               import_job_id: job.id,

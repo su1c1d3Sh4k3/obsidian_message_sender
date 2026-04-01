@@ -5,7 +5,7 @@ const navItems = [
   { path: "/contacts", icon: "person_add", label: "Contatos" },
   { path: "/groups", icon: "folder_shared", label: "Grupos" },
   { path: "/campaigns", icon: "campaign", label: "Campanhas" },
-  { path: "/schedule", icon: "calendar_month", label: "Agenda" },
+  { path: "/birthdays", icon: "cake", label: "Aniversários" },
   { path: "/settings", icon: "settings", label: "Ajustes" },
 ];
 
