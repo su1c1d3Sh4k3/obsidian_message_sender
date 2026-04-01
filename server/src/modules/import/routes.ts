@@ -51,6 +51,63 @@ export async function importRoutes(app: FastifyInstance) {
     };
   });
 
+  // POST /api/import/check-duplicates — Verificar duplicatas antes de importar
+  app.post("/check-duplicates", async (request, reply) => {
+    const body = z
+      .object({
+        filename: z.string(),
+        phone_column: z.string(),
+      })
+      .parse(request.body);
+
+    const stored = uploadedFiles.get(body.filename);
+    if (!stored) {
+      return reply.status(400).send({ error: "Arquivo expirado. Faça upload novamente." });
+    }
+
+    const workbook = XLSX.read(stored.buffer, { type: "buffer" });
+    const sheetName = workbook.SheetNames[0];
+    const sheet = workbook.Sheets[sheetName];
+    const rows = XLSX.utils.sheet_to_json<Record<string, string>>(sheet);
+
+    // Extract last 8 digits of each phone in the file
+    const filePhoneSuffixes = new Set<string>();
+    for (const row of rows) {
+      const raw = row[body.phone_column];
+      if (!raw) continue;
+      const digits = String(raw).replace(/\D/g, "");
+      if (digits.length >= 8) {
+        filePhoneSuffixes.add(digits.slice(-8));
+      }
+    }
+
+    // Load all existing contacts' phones for this tenant
+    const { data: existingContacts } = await supabaseAdmin
+      .from("contacts")
+      .select("phone, display_name")
+      .eq("tenant_id", request.user.tenant_id);
+
+    let duplicateCount = 0;
+    const duplicateExamples: string[] = [];
+
+    for (const contact of existingContacts ?? []) {
+      const digits = contact.phone.replace(/\D/g, "");
+      const suffix = digits.slice(-8);
+      if (filePhoneSuffixes.has(suffix)) {
+        duplicateCount++;
+        if (duplicateExamples.length < 5) {
+          duplicateExamples.push(contact.display_name || contact.phone);
+        }
+      }
+    }
+
+    return {
+      duplicate_count: duplicateCount,
+      total_in_file: rows.length,
+      examples: duplicateExamples,
+    };
+  });
+
   // POST /api/import/process — Processar importação
   app.post("/process", async (request, reply) => {
     const body = z
@@ -72,6 +129,7 @@ export async function importRoutes(app: FastifyInstance) {
         }),
         auto_tag_id: z.string().uuid().optional(),
         auto_list_id: z.string().uuid().optional(),
+        merge_duplicates: z.boolean().default(false),
       })
       .parse(request.body);
 
@@ -117,6 +175,7 @@ export async function importRoutes(app: FastifyInstance) {
     let skippedCount = 0;
     let errorCount = 0;
     let warningCount = 0;
+    let mergedCount = 0;
     const errors: { row: number; error: string }[] = [];
     const warnings: { row: number; phone: string; warning: string }[] = [];
     const BATCH_SIZE = 100;
@@ -134,6 +193,21 @@ export async function importRoutes(app: FastifyInstance) {
         for (const t of existingTags) {
           tagCache.set(t.name.toLowerCase().trim(), t.id);
         }
+      }
+    }
+
+    // Pre-load existing contacts indexed by last 8 digits (for duplicate detection)
+    const existingBySuffix = new Map<string, { id: string; phone: string; [key: string]: unknown }>();
+    if (body.merge_duplicates) {
+      const { data: allContacts } = await supabaseAdmin
+        .from("contacts")
+        .select("id, phone, first_name, last_name, display_name, email, organization, organization_title, city, state, address, birth_date, notes")
+        .eq("tenant_id", request.user.tenant_id);
+
+      for (const c of allContacts ?? []) {
+        const digits = c.phone.replace(/\D/g, "");
+        const suffix = digits.slice(-8);
+        existingBySuffix.set(suffix, c);
       }
     }
 
@@ -205,9 +279,81 @@ export async function importRoutes(app: FastifyInstance) {
       }
 
       if (contacts.length > 0) {
-        // Insert contacts one-by-one to handle duplicates gracefully
         const insertedIds: string[] = [];
         for (const contact of contacts) {
+          // Check for duplicate by last 8 digits when merge is enabled
+          if (body.merge_duplicates) {
+            const digits = String(contact.rawPhone).replace(/\D/g, "");
+            const suffix = digits.slice(-8);
+            const existing = existingBySuffix.get(suffix);
+
+            if (existing) {
+              // Merge: new data overwrites existing, but keep existing non-null fields when new is null
+              const mergeFields = ["first_name", "last_name", "email", "organization", "organization_title", "city", "state", "address", "birth_date", "notes"];
+              const merged: Record<string, unknown> = {};
+
+              for (const field of mergeFields) {
+                const newVal = contact.data[field];
+                const oldVal = existing[field];
+                // New has value → use new (most recent); New is null → keep old
+                merged[field] = (newVal !== null && newVal !== undefined) ? newVal : oldVal;
+              }
+
+              // Always update display_name if we have new name data
+              if (merged.first_name || merged.last_name) {
+                merged.display_name = sanitizeName(
+                  [merged.first_name, merged.last_name].filter(Boolean).join(" "),
+                ).displayName;
+              }
+
+              // Update phone to the new sanitized one
+              merged.phone = contact.data.phone;
+              merged.phone_raw = contact.data.phone_raw;
+              merged.is_valid = contact.data.is_valid;
+
+              const { error: updateError } = await supabaseAdmin
+                .from("contacts")
+                .update(merged)
+                .eq("id", existing.id);
+
+              if (updateError) {
+                errorCount++;
+                errors.push({ row: contact.rowIndex, error: `${contact.rawPhone}: ${updateError.message}` });
+              } else {
+                mergedCount++;
+                importedCount++;
+                insertedIds.push(existing.id);
+              }
+
+              // Handle tags and warnings for merged contacts
+              if (!updateError) {
+                if (contact.tagName) {
+                  const tagKey = contact.tagName.toLowerCase();
+                  let tagId = tagCache.get(tagKey);
+                  if (!tagId) {
+                    const { data: newTag } = await supabaseAdmin
+                      .from("tags")
+                      .insert({ tenant_id: request.user.tenant_id, name: contact.tagName, color: "#3B82F6" })
+                      .select("id")
+                      .single();
+                    if (newTag) { tagId = newTag.id; tagCache.set(tagKey, tagId!); }
+                  }
+                  if (tagId) {
+                    await supabaseAdmin
+                      .from("contact_tags")
+                      .upsert({ contact_id: existing.id, tag_id: tagId }, { onConflict: "contact_id,tag_id", ignoreDuplicates: true });
+                  }
+                }
+                if (contact.phoneWarnings.length > 0) {
+                  warningCount++;
+                  warnings.push({ row: contact.rowIndex, phone: contact.rawPhone, warning: contact.phoneWarnings.join("; ") });
+                }
+              }
+              continue; // Skip normal insert
+            }
+          }
+
+          // Normal insert/upsert for non-duplicates
           const { data: row, error: insertError } = await supabaseAdmin
             .from("contacts")
             .upsert(contact.data, { onConflict: "tenant_id,phone" })
@@ -301,6 +447,7 @@ export async function importRoutes(app: FastifyInstance) {
       job_id: job.id,
       status: errorCount > 0 && importedCount === 0 ? "failed" : "completed",
       imported_count: importedCount,
+      merged_count: mergedCount,
       skipped_count: skippedCount,
       error_count: errorCount,
       warning_count: warningCount,

@@ -15,12 +15,22 @@ interface PreviewData {
   preview: Record<string, string>[];
 }
 
+interface DuplicateInfo {
+  duplicate_count: number;
+  total_in_file: number;
+  examples: string[];
+}
+
 export default function ImportModal({ open, onClose }: Props) {
   const queryClient = useQueryClient();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
   const [preview, setPreview] = useState<PreviewData | null>(null);
   const [mapping, setMapping] = useState<Record<string, string>>({});
+  const [duplicateInfo, setDuplicateInfo] = useState<DuplicateInfo | null>(null);
+  const [checkingDuplicates, setCheckingDuplicates] = useState(false);
+  const [mergeDuplicates, setMergeDuplicates] = useState(false);
+  const [processing, setProcessing] = useState(false);
 
   const systemFields = [
     { key: "first_name", label: "Primeiro Nome" },
@@ -70,7 +80,6 @@ export default function ImportModal({ open, onClose }: Props) {
       if (colLower.some((c) => c === "tag" || c === "tags" || c.includes("etiqueta"))) {
         autoMap.tag = data.columns[colLower.findIndex((c) => c === "tag" || c === "tags" || c.includes("etiqueta"))];
       }
-      // Detect combined "Cidade/Estado" column
       const cityStateIdx = colLower.findIndex((c) => c.includes("cidade") && c.includes("estado"));
       if (cityStateIdx >= 0) {
         autoMap.city_state = data.columns[cityStateIdx];
@@ -93,15 +102,40 @@ export default function ImportModal({ open, onClose }: Props) {
     }
   }
 
-  async function handleProcess() {
+  async function handleCheckDuplicates() {
     if (!preview || !mapping.phone) {
       toast.error("Mapeie pelo menos o campo Número");
       return;
     }
 
+    setCheckingDuplicates(true);
+    try {
+      const result = await api.post<DuplicateInfo>("/import/check-duplicates", {
+        filename: preview.filename,
+        phone_column: mapping.phone,
+      });
+      setDuplicateInfo(result);
+
+      if (result.duplicate_count === 0) {
+        // No duplicates, proceed directly
+        handleProcess(false);
+      }
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Erro ao verificar duplicatas");
+      setCheckingDuplicates(false);
+    }
+  }
+
+  async function handleProcess(merge: boolean) {
+    if (!preview || !mapping.phone) return;
+
+    setProcessing(true);
+    setMergeDuplicates(merge);
+
     try {
       const result = await api.post<{
         imported_count: number;
+        merged_count: number;
         skipped_count: number;
         error_count: number;
         warning_count: number;
@@ -111,10 +145,16 @@ export default function ImportModal({ open, onClose }: Props) {
       }>("/import/process", {
         filename: preview.filename,
         column_mapping: mapping,
+        merge_duplicates: merge,
       });
 
       // Show main result
-      const msg = `Importação: ${result.imported_count} importados, ${result.skipped_count} ignorados, ${result.error_count} erros`;
+      const parts = [`${result.imported_count} importados`];
+      if (result.merged_count > 0) parts.push(`${result.merged_count} atualizados`);
+      if (result.skipped_count > 0) parts.push(`${result.skipped_count} ignorados`);
+      if (result.error_count > 0) parts.push(`${result.error_count} erros`);
+      const msg = `Importação: ${parts.join(", ")}`;
+
       if (result.error_count > 0 && result.imported_count === 0) {
         const errorDetail = result.errors?.[0]?.error || "";
         toast.error(`${msg}\n${errorDetail}`, { duration: 8000 });
@@ -142,16 +182,25 @@ export default function ImportModal({ open, onClose }: Props) {
       onClose();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Erro ao processar");
+    } finally {
+      setProcessing(false);
+      setCheckingDuplicates(false);
     }
   }
 
   function handleReset() {
     setPreview(null);
     setMapping({});
+    setDuplicateInfo(null);
+    setCheckingDuplicates(false);
+    setMergeDuplicates(false);
+    setProcessing(false);
     if (fileInputRef.current) fileInputRef.current.value = "";
   }
 
   if (!open) return null;
+
+  const showDuplicatePrompt = duplicateInfo && duplicateInfo.duplicate_count > 0 && !processing;
 
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center">
@@ -220,63 +269,137 @@ export default function ImportModal({ open, onClose }: Props) {
                 <button onClick={handleReset} className="text-xs text-secondary hover:text-error transition-colors">Trocar arquivo</button>
               </div>
 
-              {/* Column mapping */}
-              <div className="space-y-3">
-                <h4 className="text-xs font-bold uppercase tracking-widest text-secondary">Mapeamento de Colunas</h4>
-                {systemFields.map((field) => (
-                  <div key={field.key} className="flex items-center gap-4">
-                    <span className="text-xs font-medium w-32 text-on-surface-variant">{field.label}</span>
-                    <span className="material-symbols-outlined text-secondary text-sm">arrow_forward</span>
-                    <select
-                      value={mapping[field.key] || ""}
-                      onChange={(e) => setMapping((m) => ({ ...m, [field.key]: e.target.value }))}
-                      className="flex-1 bg-background border border-outline-variant rounded px-3 py-2 text-xs outline-none text-on-surface focus:ring-2 focus:ring-primary"
-                    >
-                      <option value="">-- Ignorar --</option>
-                      {preview.columns.map((col) => (
-                        <option key={col} value={col}>{col}</option>
-                      ))}
-                    </select>
+              {/* Duplicate detection alert */}
+              {showDuplicatePrompt && (
+                <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-5 space-y-4">
+                  <div className="flex items-start gap-3">
+                    <span className="material-symbols-outlined text-amber-500 text-xl mt-0.5">warning</span>
+                    <div className="flex-1">
+                      <p className="text-sm font-bold text-amber-400">
+                        {duplicateInfo.duplicate_count} contato(s) duplicado(s) encontrado(s)
+                      </p>
+                      <p className="text-xs text-secondary mt-1">
+                        Foram encontrados {duplicateInfo.duplicate_count} telefones na planilha que já existem na sua base
+                        (comparação pelos 8 dígitos finais).
+                      </p>
+                      {duplicateInfo.examples.length > 0 && (
+                        <p className="text-[10px] text-secondary mt-2">
+                          Exemplos: {duplicateInfo.examples.join(", ")}{duplicateInfo.duplicate_count > 5 ? "..." : ""}
+                        </p>
+                      )}
+                    </div>
                   </div>
-                ))}
-              </div>
 
-              {/* Preview table */}
-              <div className="space-y-2">
-                <h4 className="text-xs font-bold uppercase tracking-widest text-secondary">Preview (primeiras {Math.min(5, preview.preview.length)} linhas)</h4>
-                <div className="overflow-x-auto border border-outline-variant rounded-lg">
-                  <table className="w-full text-left">
-                    <thead>
-                      <tr className="bg-surface-container-high/50">
-                        {preview.columns.map((col) => (
-                          <th key={col} className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-secondary whitespace-nowrap">{col}</th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-outline-variant">
-                      {preview.preview.slice(0, 5).map((row, i) => (
-                        <tr key={i} className="hover:bg-surface-bright/30">
-                          {preview.columns.map((col) => (
-                            <td key={col} className="px-3 py-2 text-[11px] text-on-surface-variant whitespace-nowrap">{row[col] || "-"}</td>
-                          ))}
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                  <div className="space-y-2">
+                    <p className="text-xs font-semibold text-on-surface">Deseja atualizar os dados dos contatos duplicados?</p>
+                    <p className="text-[10px] text-secondary">
+                      Ao atualizar: dados da planilha substituem os existentes. Campos vazios na planilha preservam os dados atuais.
+                    </p>
+                  </div>
+
+                  <div className="flex gap-3">
+                    <button
+                      onClick={() => handleProcess(true)}
+                      disabled={processing}
+                      className="flex-1 px-4 py-2.5 bg-amber-500/20 border border-amber-500/30 text-amber-400 rounded-lg font-bold text-sm hover:bg-amber-500/30 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                    >
+                      <span className="material-symbols-outlined text-lg">sync</span>
+                      {processing ? "Processando..." : "Sim, atualizar duplicados"}
+                    </button>
+                    <button
+                      onClick={() => handleProcess(false)}
+                      disabled={processing}
+                      className="flex-1 px-4 py-2.5 bg-surface-container-high border border-outline-variant text-on-surface rounded-lg font-medium text-sm hover:bg-surface-bright transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                    >
+                      <span className="material-symbols-outlined text-lg">skip_next</span>
+                      {processing ? "Processando..." : "Não, ignorar duplicados"}
+                    </button>
+                  </div>
                 </div>
-              </div>
+              )}
+
+              {/* Processing indicator */}
+              {processing && (
+                <div className="flex items-center justify-center gap-3 p-4 bg-primary/5 border border-primary/20 rounded-xl">
+                  <span className="material-symbols-outlined text-primary animate-spin">progress_activity</span>
+                  <p className="text-sm font-medium text-primary">Processando importação...</p>
+                </div>
+              )}
+
+              {/* Column mapping (hide when showing duplicate prompt) */}
+              {!showDuplicatePrompt && !processing && (
+                <>
+                  <div className="space-y-3">
+                    <h4 className="text-xs font-bold uppercase tracking-widest text-secondary">Mapeamento de Colunas</h4>
+                    {systemFields.map((field) => (
+                      <div key={field.key} className="flex items-center gap-4">
+                        <span className="text-xs font-medium w-32 text-on-surface-variant">{field.label}</span>
+                        <span className="material-symbols-outlined text-secondary text-sm">arrow_forward</span>
+                        <select
+                          value={mapping[field.key] || ""}
+                          onChange={(e) => setMapping((m) => ({ ...m, [field.key]: e.target.value }))}
+                          className="flex-1 bg-background border border-outline-variant rounded px-3 py-2 text-xs outline-none text-on-surface focus:ring-2 focus:ring-primary"
+                        >
+                          <option value="">-- Ignorar --</option>
+                          {preview.columns.map((col) => (
+                            <option key={col} value={col}>{col}</option>
+                          ))}
+                        </select>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Preview table */}
+                  <div className="space-y-2">
+                    <h4 className="text-xs font-bold uppercase tracking-widest text-secondary">Preview (primeiras {Math.min(5, preview.preview.length)} linhas)</h4>
+                    <div className="overflow-x-auto border border-outline-variant rounded-lg">
+                      <table className="w-full text-left">
+                        <thead>
+                          <tr className="bg-surface-container-high/50">
+                            {preview.columns.map((col) => (
+                              <th key={col} className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-secondary whitespace-nowrap">{col}</th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-outline-variant">
+                          {preview.preview.slice(0, 5).map((row, i) => (
+                            <tr key={i} className="hover:bg-surface-bright/30">
+                              {preview.columns.map((col) => (
+                                <td key={col} className="px-3 py-2 text-[11px] text-on-surface-variant whitespace-nowrap">{row[col] || "-"}</td>
+                              ))}
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </>
+              )}
             </>
           )}
         </div>
 
-        {preview && (
+        {preview && !showDuplicatePrompt && !processing && (
           <div className="flex justify-end gap-3 p-6 border-t border-outline-variant">
             <button onClick={() => { handleReset(); onClose(); }} className="px-4 py-2.5 bg-surface-container-high border border-outline-variant text-on-surface rounded font-medium text-sm hover:bg-surface-bright transition-all">
               Cancelar
             </button>
-            <button onClick={handleProcess} className="px-6 py-2.5 bg-primary text-on-primary rounded font-bold text-sm hover:opacity-90 transition-all flex items-center gap-2">
-              <span className="material-symbols-outlined text-lg">upload</span>
-              Importar {preview.totalRows} contatos
+            <button
+              onClick={handleCheckDuplicates}
+              disabled={checkingDuplicates}
+              className="px-6 py-2.5 bg-primary text-on-primary rounded font-bold text-sm hover:opacity-90 transition-all flex items-center gap-2 disabled:opacity-50"
+            >
+              {checkingDuplicates ? (
+                <>
+                  <span className="material-symbols-outlined text-lg animate-spin">progress_activity</span>
+                  Verificando...
+                </>
+              ) : (
+                <>
+                  <span className="material-symbols-outlined text-lg">upload</span>
+                  Importar {preview.totalRows} contatos
+                </>
+              )}
             </button>
           </div>
         )}
