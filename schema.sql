@@ -86,6 +86,7 @@ CREATE TABLE contacts (
     birth_date DATE,
     notes TEXT,
     custom_fields JSONB DEFAULT '{}',
+    last_message_at TIMESTAMPTZ,
     is_valid BOOLEAN DEFAULT true,
     is_blacklisted BOOLEAN DEFAULT false,
     source VARCHAR(100) DEFAULT 'manual',

@@ -103,6 +103,12 @@ export function startBirthdayChecker() {
           try {
             await sendBirthdayMessage(campaign, sender, contact);
             sentCount++;
+
+            // Update last_message_at on the contact
+            await supabaseAdmin
+              .from("contacts")
+              .update({ last_message_at: new Date().toISOString() })
+              .eq("id", contact.id);
           } catch (err) {
             console.error(`[birthday] Failed to send to ${contact.phone}:`, err);
           }

@@ -27,6 +27,7 @@ interface Contact {
   organization: string | null;
   is_valid: boolean;
   is_blacklisted: boolean;
+  last_message_at: string | null;
   created_at: string;
   contact_tags?: Array<{ tags: { id: string; name: string; color: string } }>;
 }
@@ -440,7 +441,11 @@ export default function Contacts() {
 
                           {/* Última Mensagem */}
                           <td className="px-4 py-3 hidden xl:table-cell">
-                            <span className="text-[11px] text-secondary font-mono">-</span>
+                            <span className="text-[11px] text-secondary font-mono">
+                              {contact.last_message_at
+                                ? new Date(contact.last_message_at).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "2-digit", hour: "2-digit", minute: "2-digit" })
+                                : "-"}
+                            </span>
                           </td>
 
                           {/* Status */}

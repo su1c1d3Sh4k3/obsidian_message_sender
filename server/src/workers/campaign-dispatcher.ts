@@ -405,14 +405,21 @@ function scheduleSenderLoop(
         }
       }
 
+      const sentAt = new Date().toISOString();
       await supabaseAdmin
         .from("campaign_messages")
         .update({
           status: "sent",
           message_rendered: renderedParts.join(" | "),
-          sent_at: new Date().toISOString(),
+          sent_at: sentAt,
         })
         .eq("id", msg.id);
+
+      // Update last_message_at on the contact
+      await supabaseAdmin
+        .from("contacts")
+        .update({ last_message_at: sentAt })
+        .eq("id", msg.contact_id);
 
       // Increment sent_count
       const { data: curr } = await supabaseAdmin
