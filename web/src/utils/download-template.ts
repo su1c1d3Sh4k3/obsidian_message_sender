@@ -7,6 +7,7 @@ export function downloadTemplate() {
     "Tag",
     "Número",
     "Cidade/Estado",
+    "Data de Nascimento",
   ];
 
   // Gera XML Spreadsheet (compatível com .xls)
@@ -26,6 +27,7 @@ export function downloadTemplate() {
         <Cell><Data ss:Type="String">Lead Quente</Data></Cell>
         <Cell><Data ss:Type="String">5531999998888</Data></Cell>
         <Cell><Data ss:Type="String">Belo Horizonte/MG</Data></Cell>
+        <Cell><Data ss:Type="String">25/12/1990</Data></Cell>
       </Row>
     </Table>
   </Worksheet>
