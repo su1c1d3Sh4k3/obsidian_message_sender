@@ -216,7 +216,13 @@ export default function Senders() {
                       onClick={() => {
                         setConnectingSenderId(sender.id);
                         setPairCode((sender.settings as { pin_code?: string })?.pin_code ?? null);
-                        setPhoneInput(sender.phone || "");
+                        const raw = (sender.phone || "").replace(/\D/g, "").replace(/^55/, "");
+                        let masked = "";
+                        if (raw.length > 0) masked += "(" + raw.slice(0, 2);
+                        if (raw.length >= 2) masked += ") ";
+                        if (raw.length > 2) masked += raw.slice(2, 7);
+                        if (raw.length > 7) masked += "-" + raw.slice(7, 11);
+                        setPhoneInput(masked);
                       }}
                       className="flex-1 px-3 py-2 text-xs font-medium bg-primary/10 border border-primary/20 text-primary rounded hover:bg-primary/20 transition-all flex items-center justify-center gap-1"
                     >
@@ -349,25 +355,34 @@ export default function Senders() {
                   {/* Step 1: Enter phone */}
                   <div className="space-y-2">
                     <label className="text-xs font-semibold uppercase tracking-wider text-secondary">
-                      Número de telefone (com DDI)
+                      Número de telefone
                     </label>
                     <div className="relative">
-                      <span className="absolute left-4 top-1/2 -translate-y-1/2 text-secondary text-sm font-mono">+</span>
+                      <span className="absolute left-4 top-1/2 -translate-y-1/2 text-secondary text-sm font-mono">+55</span>
                       <input
                         value={phoneInput}
-                        onChange={(e) => setPhoneInput(e.target.value.replace(/\D/g, ""))}
-                        className="w-full bg-background border border-outline-variant rounded pl-8 pr-4 py-3 focus:ring-2 focus:ring-primary focus:border-transparent text-sm outline-none font-mono text-on-surface text-lg tracking-wider"
-                        placeholder="5531999999999"
+                        onChange={(e) => {
+                          const digits = e.target.value.replace(/\D/g, "").slice(0, 11);
+                          let masked = "";
+                          if (digits.length > 0) masked += "(" + digits.slice(0, 2);
+                          if (digits.length >= 2) masked += ") ";
+                          if (digits.length > 2) masked += digits.slice(2, 7);
+                          if (digits.length > 7) masked += "-" + digits.slice(7, 11);
+                          setPhoneInput(masked);
+                        }}
+                        className="w-full bg-background border border-outline-variant rounded pl-12 pr-4 py-3 focus:ring-2 focus:ring-primary focus:border-transparent text-sm outline-none font-mono text-on-surface text-lg tracking-wider"
+                        placeholder="(31) 99999-9999"
                         autoFocus
                       />
                     </div>
-                    <p className="text-[10px] text-secondary">Formato: DDI + DDD + número, sem espaços. Ex: 5531999999999</p>
+                    <p className="text-[10px] text-secondary">DDI +55 fixo. Digite o DDD + número. Ex: (31) 99999-9999</p>
                   </div>
 
                   <button
                     onClick={() => {
-                      if (phoneInput.length < 10) return toast.error("Número inválido");
-                      connectMutation.mutate({ id: connectingSenderId, phone: phoneInput });
+                      const rawDigits = phoneInput.replace(/\D/g, "");
+                      if (rawDigits.length < 10) return toast.error("Número inválido — digite DDD + número");
+                      connectMutation.mutate({ id: connectingSenderId, phone: "55" + rawDigits });
                     }}
                     disabled={connectMutation.isPending}
                     className="w-full px-6 py-3 bg-primary text-on-primary rounded font-bold text-sm hover:opacity-90 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
