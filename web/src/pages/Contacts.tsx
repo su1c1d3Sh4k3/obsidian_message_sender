@@ -427,7 +427,8 @@ export default function Contacts() {
                               {contact.contact_tags?.slice(0, 2).map((ct) => (
                                 <span
                                   key={ct.tags.id}
-                                  className="text-[9px] font-bold px-1.5 py-0.5 rounded border whitespace-nowrap"
+                                  title={ct.tags.name}
+                                  className="text-[9px] font-bold px-1.5 py-0.5 rounded border whitespace-nowrap truncate max-w-[70px] inline-block"
                                   style={{ backgroundColor: `${ct.tags.color}15`, color: ct.tags.color, borderColor: `${ct.tags.color}30` }}
                                 >
                                   {ct.tags.name.toUpperCase()}
