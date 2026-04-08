@@ -174,7 +174,7 @@ CREATE INDEX idx_campaigns_scheduled ON campaigns(status, scheduled_at) WHERE st
 CREATE TABLE campaign_messages (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     campaign_id UUID NOT NULL REFERENCES campaigns(id) ON DELETE CASCADE,
-    contact_id UUID NOT NULL REFERENCES contacts(id),
+    contact_id UUID NOT NULL REFERENCES contacts(id) ON DELETE CASCADE,
     sender_id UUID REFERENCES senders(id),
     phone VARCHAR(20) NOT NULL,
     contact_name VARCHAR(255),
