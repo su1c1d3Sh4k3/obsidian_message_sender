@@ -14,7 +14,7 @@ interface ExportContact {
 
 interface ContactsResponse {
   data: ExportContact[];
-  pagination: { total: number };
+  pagination: { total: number; totalPages: number };
 }
 
 function escapeXml(value: string): string {
@@ -28,8 +28,15 @@ function escapeXml(value: string): string {
 
 /** Busca todos os contatos e baixa como .xls */
 export async function exportContacts() {
-  const res = await api.get<ContactsResponse>("/contacts?page=1&limit=100000");
-  const contacts = res.data ?? [];
+  const pageSize = 1000;
+  const first = await api.get<ContactsResponse>(`/contacts?page=1&limit=${pageSize}`);
+  const contacts: ExportContact[] = [...(first.data ?? [])];
+  const totalPages = first.pagination?.totalPages ?? 1;
+
+  for (let page = 2; page <= totalPages; page++) {
+    const res = await api.get<ContactsResponse>(`/contacts?page=${page}&limit=${pageSize}`);
+    contacts.push(...(res.data ?? []));
+  }
 
   const headers = [
     "Primeiro Nome",
