@@ -28,14 +28,18 @@ function escapeXml(value: string): string {
 
 /** Busca todos os contatos e baixa como .xls */
 export async function exportContacts() {
-  const pageSize = 1000;
-  const first = await api.get<ContactsResponse>(`/contacts?page=1&limit=${pageSize}`);
-  const contacts: ExportContact[] = [...(first.data ?? [])];
-  const totalPages = first.pagination?.totalPages ?? 1;
-
-  for (let page = 2; page <= totalPages; page++) {
+  const pageSize = 500;
+  const contacts: ExportContact[] = [];
+  let page = 1;
+  // Loop até receber menos que pageSize (última página)
+  // Proteção: máx 500 páginas (250k contatos)
+  while (page <= 500) {
     const res = await api.get<ContactsResponse>(`/contacts?page=${page}&limit=${pageSize}`);
-    contacts.push(...(res.data ?? []));
+    const batch = res.data ?? [];
+    contacts.push(...batch);
+    console.log(`[export] page ${page}: ${batch.length} (total so far: ${contacts.length} / ${res.pagination?.total})`);
+    if (batch.length < pageSize) break;
+    page++;
   }
 
   const headers = [
