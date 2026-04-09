@@ -341,8 +341,9 @@ function scheduleSenderLoop(
       .single();
 
     if (contact) {
-      contactVars.primeiro_nome = contact.first_name || contactVars.primeiro_nome;
-      contactVars.nome_completo = contact.display_name || [contact.first_name, contact.last_name].filter(Boolean).join(" ") || contactVars.nome_completo;
+      const displayName = contact.display_name || [contact.first_name, contact.last_name].filter(Boolean).join(" ") || msg.contact_name || "";
+      contactVars.primeiro_nome = displayName.split(" ")[0] || contact.first_name || undefined;
+      contactVars.nome_completo = displayName || contactVars.nome_completo;
       contactVars.cidade = contact.city || undefined;
       contactVars.empresa = contact.organization || undefined;
     }

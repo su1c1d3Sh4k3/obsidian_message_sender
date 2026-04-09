@@ -143,7 +143,7 @@ export function startBirthdayChecker() {
 
 async function sendBirthdayMessage(campaign: any, sender: any, contact: any) {
   const contactVars: Record<string, string | undefined> = {
-    primeiro_nome: contact.first_name || contact.display_name?.split(" ")[0],
+    primeiro_nome: contact.display_name?.split(" ")[0] || contact.first_name,
     nome_completo: contact.display_name || [contact.first_name, contact.last_name].filter(Boolean).join(" "),
     telefone: contact.phone,
     cidade: contact.city || undefined,
