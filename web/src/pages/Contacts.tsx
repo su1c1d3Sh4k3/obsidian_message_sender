@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { formatPhone, extractDDD } from "@/utils/phone";
 import { downloadTemplate } from "@/utils/download-template";
+import { exportContacts } from "@/utils/export-contacts";
 import AddContactModal from "@/components/contacts/AddContactModal";
 import EditContactModal from "@/components/contacts/EditContactModal";
 import ImportModal from "@/components/contacts/ImportModal";
@@ -48,6 +49,7 @@ export default function Contacts() {
   const [showEditModal, setShowEditModal] = useState(false);
   const [editingContact, setEditingContact] = useState<Contact | null>(null);
   const [showImportModal, setShowImportModal] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
   const [showGroupModal, setShowGroupModal] = useState(false);
   const [filtersOpen, setFiltersOpen] = useState(true);
 
@@ -199,6 +201,24 @@ export default function Contacts() {
           >
             <span className="material-symbols-outlined text-lg">download</span>
             Baixar Modelo
+          </button>
+          <button
+            disabled={isExporting}
+            onClick={async () => {
+              try {
+                setIsExporting(true);
+                const count = await exportContacts();
+                toast.success(`${count} contatos exportados`);
+              } catch (err) {
+                toast.error((err as Error).message || "Erro ao exportar");
+              } finally {
+                setIsExporting(false);
+              }
+            }}
+            className="px-4 py-2 bg-surface-container border border-outline-variant text-on-surface rounded font-medium text-sm hover:bg-surface-bright transition-all active:scale-95 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <span className="material-symbols-outlined text-lg">file_download</span>
+            {isExporting ? "Exportando..." : "Exportar Tabela"}
           </button>
           <button
             onClick={() => setShowImportModal(true)}
