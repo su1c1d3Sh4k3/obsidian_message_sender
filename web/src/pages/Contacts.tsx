@@ -8,6 +8,7 @@ import AddContactModal from "@/components/contacts/AddContactModal";
 import EditContactModal from "@/components/contacts/EditContactModal";
 import ImportModal from "@/components/contacts/ImportModal";
 import CreateGroupModal from "@/components/contacts/CreateGroupModal";
+import AddToGroupModal from "@/components/contacts/AddToGroupModal";
 import toast from "react-hot-toast";
 
 interface Tag {
@@ -51,6 +52,7 @@ export default function Contacts() {
   const [showImportModal, setShowImportModal] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [showGroupModal, setShowGroupModal] = useState(false);
+  const [showAddToGroupModal, setShowAddToGroupModal] = useState(false);
   const [filtersOpen, setFiltersOpen] = useState(true);
 
   // Filters
@@ -245,6 +247,13 @@ export default function Contacts() {
           <div className="flex-1" />
           <button onClick={selectAllFiltered} className="px-3 py-1.5 text-xs font-medium text-primary hover:bg-primary/10 rounded transition-all">
             Selecionar todos ({displayTotal})
+          </button>
+          <button
+            onClick={() => setShowAddToGroupModal(true)}
+            className="px-3 py-1.5 text-xs font-bold bg-primary text-on-primary rounded hover:opacity-90 transition-all flex items-center gap-1"
+          >
+            <span className="material-symbols-outlined text-sm">playlist_add</span>
+            Adicionar ao Grupo
           </button>
           <button
             onClick={() => setShowGroupModal(true)}
@@ -574,6 +583,7 @@ export default function Contacts() {
       <EditContactModal open={showEditModal} onClose={() => { setShowEditModal(false); setEditingContact(null); }} contact={editingContact} />
       <ImportModal open={showImportModal} onClose={() => setShowImportModal(false)} />
       <CreateGroupModal open={showGroupModal} onClose={() => setShowGroupModal(false)} selectedIds={Array.from(selectedIds)} />
+      <AddToGroupModal open={showAddToGroupModal} onClose={() => setShowAddToGroupModal(false)} selectedIds={Array.from(selectedIds)} />
     </div>
   );
 }
