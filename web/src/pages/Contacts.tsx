@@ -132,9 +132,23 @@ export default function Contacts() {
     }
   }
 
-  function selectAllFiltered() {
-    setSelectedIds(new Set(contacts.map((c) => c.id)));
-    toast.success(`${contacts.length} contatos da página selecionados`);
+  async function selectAllFiltered() {
+    try {
+      const params = new URLSearchParams();
+      if (search) params.set("search", search);
+      if (filterCity) {
+        const [city] = filterCity.split("/");
+        if (city) params.set("city", city);
+      }
+      if (filterTag) params.set("tag_name", filterTag);
+      if (filterDDD) params.set("ddd", filterDDD);
+      if (filterOrg) params.set("organization", filterOrg);
+      const res = await api.get<{ ids: string[] }>(`/contacts/ids?${params}`);
+      setSelectedIds(new Set(res.ids));
+      toast.success(`${res.ids.length} contatos selecionados`);
+    } catch {
+      toast.error("Erro ao selecionar contatos");
+    }
   }
 
   // Bulk delete

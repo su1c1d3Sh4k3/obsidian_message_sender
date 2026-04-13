@@ -93,6 +93,62 @@ export async function contactsRoutes(app: FastifyInstance) {
     };
   });
 
+  // GET /api/contacts/ids — Retorna todos os IDs que casam com os filtros atuais
+  app.get("/ids", async (request) => {
+    const query = z
+      .object({
+        search: z.string().optional(),
+        city: z.string().optional(),
+        state: z.string().optional(),
+        tag_id: z.string().uuid().optional(),
+        tag_name: z.string().optional(),
+        ddd: z.string().optional(),
+        organization: z.string().optional(),
+        is_valid: z.enum(["true", "false"]).optional(),
+        is_blacklisted: z.enum(["true", "false"]).optional(),
+      })
+      .parse(request.query);
+
+    let q = supabaseAdmin
+      .from("contacts")
+      .select("id")
+      .eq("tenant_id", request.user.tenant_id);
+
+    if (query.search) {
+      q = q.or(
+        `display_name.ilike.%${query.search}%,phone.ilike.%${query.search}%,organization.ilike.%${query.search}%`,
+      );
+    }
+    if (query.city) q = q.ilike("city", `%${query.city}%`);
+    if (query.state) q = q.eq("state", query.state);
+    if (query.organization) q = q.eq("organization", query.organization);
+    if (query.ddd) q = q.like("phone", `55${query.ddd}%`);
+    if (query.is_valid !== undefined) q = q.eq("is_valid", query.is_valid === "true");
+    if (query.is_blacklisted !== undefined)
+      q = q.eq("is_blacklisted", query.is_blacklisted === "true");
+
+    if (query.tag_name || query.tag_id) {
+      let tagQ = supabaseAdmin
+        .from("contact_tags")
+        .select("contact_id, tags!inner(name)");
+      if (query.tag_id) {
+        tagQ = tagQ.eq("tag_id", query.tag_id);
+      } else if (query.tag_name) {
+        tagQ = tagQ.eq("tags.name", query.tag_name);
+      }
+      const { data: tagContacts, error: tagError } = await tagQ;
+      if (tagError) throw tagError;
+      const contactIds = (tagContacts ?? []).map((tc: { contact_id: string }) => tc.contact_id);
+      if (contactIds.length === 0) return { ids: [] };
+      q = q.in("id", contactIds);
+    }
+
+    const { data, error } = await q;
+    if (error) throw error;
+
+    return { ids: (data ?? []).map((r: { id: string }) => r.id) };
+  });
+
   // GET /api/contacts/filter-options — Valores distintos para dropdowns
   app.get("/filter-options", async (request) => {
     const tenantId = request.user.tenant_id;
