@@ -143,10 +143,20 @@ export async function contactsRoutes(app: FastifyInstance) {
       q = q.in("id", contactIds);
     }
 
-    const { data, error } = await q;
-    if (error) throw error;
+    // Paginate to fetch ALL matching IDs (Supabase caps at 1000 per request)
+    const allIds: string[] = [];
+    const pageSize = 1000;
+    let offset = 0;
+    while (true) {
+      const { data, error } = await q.range(offset, offset + pageSize - 1);
+      if (error) throw error;
+      const batch = (data ?? []).map((r: { id: string }) => r.id);
+      allIds.push(...batch);
+      if (batch.length < pageSize) break;
+      offset += pageSize;
+    }
 
-    return { ids: (data ?? []).map((r: { id: string }) => r.id) };
+    return { ids: allIds };
   });
 
   // GET /api/contacts/filter-options — Valores distintos para dropdowns
@@ -377,9 +387,10 @@ export async function contactsRoutes(app: FastifyInstance) {
     switch (action) {
       case "add_tag": {
         if (!body.tag_id) throw new Error("tag_id required");
-        await supabaseAdmin
-          .from("contact_tags")
-          .upsert(contact_ids.map((cid) => ({ contact_id: cid, tag_id: body.tag_id! })));
+        const tagRows = contact_ids.map((cid) => ({ contact_id: cid, tag_id: body.tag_id! }));
+        for (let i = 0; i < tagRows.length; i += 500) {
+          await supabaseAdmin.from("contact_tags").upsert(tagRows.slice(i, i + 500));
+        }
         break;
       }
       case "remove_tag": {
@@ -393,9 +404,10 @@ export async function contactsRoutes(app: FastifyInstance) {
       }
       case "add_to_list": {
         if (!body.list_id) throw new Error("list_id required");
-        await supabaseAdmin
-          .from("list_contacts")
-          .upsert(contact_ids.map((cid) => ({ list_id: body.list_id!, contact_id: cid })));
+        const listRows = contact_ids.map((cid) => ({ list_id: body.list_id!, contact_id: cid }));
+        for (let i = 0; i < listRows.length; i += 500) {
+          await supabaseAdmin.from("list_contacts").upsert(listRows.slice(i, i + 500));
+        }
         break;
       }
       case "remove_from_list": {
@@ -416,11 +428,13 @@ export async function contactsRoutes(app: FastifyInstance) {
         break;
       }
       case "delete": {
-        await supabaseAdmin
-          .from("contacts")
-          .delete()
-          .in("id", contact_ids)
-          .eq("tenant_id", request.user.tenant_id);
+        for (let i = 0; i < contact_ids.length; i += 500) {
+          await supabaseAdmin
+            .from("contacts")
+            .delete()
+            .in("id", contact_ids.slice(i, i + 500))
+            .eq("tenant_id", request.user.tenant_id);
+        }
         break;
       }
     }

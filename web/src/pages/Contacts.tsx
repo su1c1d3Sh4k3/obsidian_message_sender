@@ -107,7 +107,7 @@ export default function Contacts() {
   const allOrgs = filterOptions?.organizations ?? [];
 
   // Selection
-  const allVisibleSelected = paginatedContacts.length > 0 && paginatedContacts.every((c) => selectedIds.has(c.id));
+  const allSelected = selectedIds.size > 0 && selectedIds.size >= displayTotal;
 
   function toggleSelect(id: string) {
     setSelectedIds((prev) => {
@@ -119,18 +119,10 @@ export default function Contacts() {
   }
 
   function toggleSelectAll() {
-    if (allVisibleSelected) {
-      setSelectedIds((prev) => {
-        const next = new Set(prev);
-        paginatedContacts.forEach((c) => next.delete(c.id));
-        return next;
-      });
+    if (selectedIds.size > 0) {
+      setSelectedIds(new Set());
     } else {
-      setSelectedIds((prev) => {
-        const next = new Set(prev);
-        paginatedContacts.forEach((c) => next.add(c.id));
-        return next;
-      });
+      selectAllFiltered();
     }
   }
 
@@ -386,7 +378,7 @@ export default function Contacts() {
                     <th className="px-4 py-4 w-10">
                       <input
                         type="checkbox"
-                        checked={allVisibleSelected && paginatedContacts.length > 0}
+                        checked={allSelected}
                         onChange={toggleSelectAll}
                         className="rounded border-outline bg-background text-primary focus:ring-primary focus:ring-offset-0 cursor-pointer"
                       />
