@@ -19,6 +19,9 @@ export async function contactsRoutes(app: FastifyInstance) {
         city: z.string().optional(),
         state: z.string().optional(),
         tag_id: z.string().uuid().optional(),
+        tag_name: z.string().optional(),
+        ddd: z.string().optional(),
+        organization: z.string().optional(),
         list_id: z.string().uuid().optional(),
         is_valid: z.enum(["true", "false"]).optional(),
         is_blacklisted: z.enum(["true", "false"]).optional(),
@@ -44,9 +47,36 @@ export async function contactsRoutes(app: FastifyInstance) {
     }
     if (query.city) q = q.ilike("city", `%${query.city}%`);
     if (query.state) q = q.eq("state", query.state);
+    if (query.organization) q = q.eq("organization", query.organization);
+    if (query.ddd) q = q.like("phone", `55${query.ddd}%`);
     if (query.is_valid !== undefined) q = q.eq("is_valid", query.is_valid === "true");
     if (query.is_blacklisted !== undefined)
       q = q.eq("is_blacklisted", query.is_blacklisted === "true");
+
+    // Tag filter: need to get contact IDs that have the tag, then filter
+    if (query.tag_name || query.tag_id) {
+      let tagQ = supabaseAdmin
+        .from("contact_tags")
+        .select("contact_id, tags!inner(name)")
+
+      if (query.tag_id) {
+        tagQ = tagQ.eq("tag_id", query.tag_id);
+      } else if (query.tag_name) {
+        tagQ = tagQ.eq("tags.name", query.tag_name);
+      }
+
+      const { data: tagContacts, error: tagError } = await tagQ;
+      if (tagError) throw tagError;
+
+      const contactIds = (tagContacts ?? []).map((tc: { contact_id: string }) => tc.contact_id);
+      if (contactIds.length === 0) {
+        return {
+          data: [],
+          pagination: { page: query.page, limit: query.limit, total: 0, totalPages: 0 },
+        };
+      }
+      q = q.in("id", contactIds);
+    }
 
     const { data, count, error } = await q;
 
@@ -61,6 +91,56 @@ export async function contactsRoutes(app: FastifyInstance) {
         totalPages: Math.ceil((count ?? 0) / query.limit),
       },
     };
+  });
+
+  // GET /api/contacts/filter-options — Valores distintos para dropdowns
+  app.get("/filter-options", async (request) => {
+    const tenantId = request.user.tenant_id;
+
+    const [citiesRes, orgsRes, dddsRes] = await Promise.all([
+      supabaseAdmin
+        .from("contacts")
+        .select("city, state")
+        .eq("tenant_id", tenantId)
+        .not("city", "is", null)
+        .not("city", "eq", ""),
+      supabaseAdmin
+        .from("contacts")
+        .select("organization")
+        .eq("tenant_id", tenantId)
+        .not("organization", "is", null)
+        .not("organization", "eq", ""),
+      supabaseAdmin
+        .from("contacts")
+        .select("phone")
+        .eq("tenant_id", tenantId),
+    ]);
+
+    if (citiesRes.error) throw citiesRes.error;
+    if (orgsRes.error) throw orgsRes.error;
+    if (dddsRes.error) throw dddsRes.error;
+
+    const cities = [...new Set(
+      (citiesRes.data ?? []).map((c: { city: string; state: string | null }) =>
+        [c.city, c.state].filter(Boolean).join("/")
+      ).filter(Boolean)
+    )].sort();
+
+    const organizations = [...new Set(
+      (orgsRes.data ?? []).map((c: { organization: string }) => c.organization)
+    )].sort();
+
+    const ddds = [...new Set(
+      (dddsRes.data ?? [])
+        .map((c: { phone: string }) => {
+          const clean = c.phone.replace(/\D/g, "");
+          if (clean.startsWith("55") && clean.length >= 4) return clean.slice(2, 4);
+          return null;
+        })
+        .filter(Boolean) as string[]
+    )].sort();
+
+    return { cities, organizations, ddds };
   });
 
   // GET /api/contacts/:id

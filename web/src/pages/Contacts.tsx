@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { formatPhone, extractDDD } from "@/utils/phone";
@@ -61,9 +61,9 @@ export default function Contacts() {
 
   const queryClient = useQueryClient();
 
-  // Fetch contacts from API (server-side pagination + search + city filter)
+  // Fetch contacts from API (all filters server-side)
   const { data: apiData, isLoading } = useQuery({
-    queryKey: ["contacts", page, perPage, search, filterCity],
+    queryKey: ["contacts", page, perPage, search, filterCity, filterTag, filterDDD, filterOrg],
     queryFn: () => {
       const params = new URLSearchParams({ page: String(page), limit: String(perPage) });
       if (search) params.set("search", search);
@@ -71,6 +71,9 @@ export default function Contacts() {
         const [city] = filterCity.split("/");
         if (city) params.set("city", city);
       }
+      if (filterTag) params.set("tag_name", filterTag);
+      if (filterDDD) params.set("ddd", filterDDD);
+      if (filterOrg) params.set("organization", filterOrg);
       return api.get<ContactsResponse>(`/contacts?${params}`);
     },
   });
@@ -81,41 +84,25 @@ export default function Contacts() {
     queryFn: () => api.get<Tag[]>("/tags"),
   });
 
+  // Fetch distinct filter options from API
+  interface FilterOptions { cities: string[]; organizations: string[]; ddds: string[] }
+  const { data: filterOptions } = useQuery({
+    queryKey: ["contact-filter-options"],
+    queryFn: () => api.get<FilterOptions>("/contacts/filter-options"),
+  });
+
   const contacts = apiData?.data ?? [];
 
-  // Client-side filters (tag, DDD, org are not handled server-side)
-  const filteredContacts = useMemo(() => {
-    let list = contacts;
-    if (filterTag) {
-      list = list.filter((c) => c.contact_tags?.some((ct) => ct.tags.name === filterTag));
-    }
-    if (filterDDD) {
-      list = list.filter((c) => extractDDD(c.phone) === filterDDD);
-    }
-    if (filterOrg) {
-      list = list.filter((c) => c.organization === filterOrg);
-    }
-    return list;
-  }, [contacts, filterTag, filterDDD, filterOrg]);
+  // All filtering is now server-side — use API pagination directly
+  const paginatedContacts = contacts;
+  const totalPages = apiData?.pagination?.totalPages ?? 1;
+  const displayTotal = apiData?.pagination?.total ?? 0;
 
-  // If client-side filters are active, we paginate locally; otherwise use API pagination
-  const hasClientFilters = !!(filterTag || filterDDD || filterOrg);
-  const paginatedContacts = hasClientFilters
-    ? filteredContacts.slice((page - 1) * perPage, page * perPage)
-    : contacts;
-
-  const totalPages = hasClientFilters
-    ? Math.ceil(filteredContacts.length / perPage)
-    : (apiData?.pagination?.totalPages ?? 1);
-  const displayTotal = hasClientFilters
-    ? filteredContacts.length
-    : (apiData?.pagination?.total ?? 0);
-
-  // Filter dropdown options
+  // Filter dropdown options from server
   const allTags = apiTags;
-  const allCities = useMemo(() => [...new Set(contacts.map((c) => [c.city, c.state].filter(Boolean).join("/")).filter(Boolean))].sort(), [contacts]);
-  const allDDDs = useMemo(() => [...new Set(contacts.map((c) => extractDDD(c.phone)).filter(Boolean))].sort(), [contacts]);
-  const allOrgs = useMemo(() => [...new Set(contacts.map((c) => c.organization).filter(Boolean) as string[])].sort(), [contacts]);
+  const allCities = filterOptions?.cities ?? [];
+  const allDDDs = filterOptions?.ddds ?? [];
+  const allOrgs = filterOptions?.organizations ?? [];
 
   // Selection
   const allVisibleSelected = paginatedContacts.length > 0 && paginatedContacts.every((c) => selectedIds.has(c.id));
@@ -146,8 +133,8 @@ export default function Contacts() {
   }
 
   function selectAllFiltered() {
-    setSelectedIds(new Set(filteredContacts.map((c) => c.id)));
-    toast.success(`${filteredContacts.length} contatos selecionados`);
+    setSelectedIds(new Set(contacts.map((c) => c.id)));
+    toast.success(`${contacts.length} contatos da página selecionados`);
   }
 
   // Bulk delete
@@ -243,7 +230,7 @@ export default function Contacts() {
           <span className="text-sm font-bold text-primary">{selectedIds.size} selecionado(s)</span>
           <div className="flex-1" />
           <button onClick={selectAllFiltered} className="px-3 py-1.5 text-xs font-medium text-primary hover:bg-primary/10 rounded transition-all">
-            Selecionar todos ({filteredContacts.length})
+            Selecionar todos ({displayTotal})
           </button>
           <button
             onClick={() => setShowGroupModal(true)}
