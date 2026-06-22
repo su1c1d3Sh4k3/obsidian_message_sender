@@ -108,6 +108,9 @@ export default function Contacts() {
 
   // Selection
   const allSelected = selectedIds.size > 0 && selectedIds.size >= displayTotal;
+  const pageIds = paginatedContacts.map((c) => c.id);
+  const pageAllSelected = pageIds.length > 0 && pageIds.every((id) => selectedIds.has(id));
+  const [showSelectMenu, setShowSelectMenu] = useState(false);
 
   function toggleSelect(id: string) {
     setSelectedIds((prev) => {
@@ -118,11 +121,20 @@ export default function Contacts() {
     });
   }
 
+  function selectPage() {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      pageIds.forEach((id) => next.add(id));
+      return next;
+    });
+    setShowSelectMenu(false);
+  }
+
   function toggleSelectAll() {
     if (selectedIds.size > 0) {
       setSelectedIds(new Set());
     } else {
-      selectAllFiltered();
+      selectPage();
     }
   }
 
@@ -236,10 +248,12 @@ export default function Contacts() {
       {selectedIds.size > 0 && (
         <div className="flex items-center gap-3 px-4 py-3 bg-primary/10 border border-primary/20 rounded-lg">
           <span className="text-sm font-bold text-primary">{selectedIds.size} selecionado(s)</span>
+          {selectedIds.size < displayTotal && (
+            <button onClick={selectAllFiltered} className="px-3 py-1.5 text-xs font-medium text-primary hover:bg-primary/10 rounded transition-all">
+              Selecionar todos ({displayTotal})
+            </button>
+          )}
           <div className="flex-1" />
-          <button onClick={selectAllFiltered} className="px-3 py-1.5 text-xs font-medium text-primary hover:bg-primary/10 rounded transition-all">
-            Selecionar todos ({displayTotal})
-          </button>
           <button
             onClick={() => setShowAddToGroupModal(true)}
             className="px-3 py-1.5 text-xs font-bold bg-primary text-on-primary rounded hover:opacity-90 transition-all flex items-center gap-1"
@@ -375,13 +389,51 @@ export default function Contacts() {
               <table className="w-full text-left border-collapse">
                 <thead>
                   <tr className="bg-surface-container-high/50">
-                    <th className="px-4 py-4 w-10">
-                      <input
-                        type="checkbox"
-                        checked={allSelected}
-                        onChange={toggleSelectAll}
-                        className="rounded border-outline bg-background text-primary focus:ring-primary focus:ring-offset-0 cursor-pointer"
-                      />
+                    <th className="px-4 py-4 w-14">
+                      <div className="relative flex items-center gap-0.5">
+                        <input
+                          type="checkbox"
+                          checked={pageAllSelected || allSelected}
+                          onChange={toggleSelectAll}
+                          className="rounded border-outline bg-background text-primary focus:ring-primary focus:ring-offset-0 cursor-pointer"
+                        />
+                        <button
+                          onClick={() => setShowSelectMenu((v) => !v)}
+                          className="p-0.5 text-secondary hover:text-on-surface transition-colors rounded"
+                        >
+                          <span className="material-symbols-outlined text-[14px]">arrow_drop_down</span>
+                        </button>
+                        {showSelectMenu && (
+                          <>
+                            <div className="fixed inset-0 z-[50]" onClick={() => setShowSelectMenu(false)} />
+                            <div className="absolute top-full left-0 mt-1 z-[51] bg-surface-container border border-outline-variant rounded-lg shadow-xl py-1 min-w-[180px]">
+                              <button
+                                onClick={selectPage}
+                                className="w-full text-left px-3 py-2 text-xs hover:bg-surface-bright transition-colors flex items-center gap-2"
+                              >
+                                <span className="material-symbols-outlined text-sm text-secondary">checklist</span>
+                                Selecionar página ({pageIds.length})
+                              </button>
+                              <button
+                                onClick={() => { selectAllFiltered(); setShowSelectMenu(false); }}
+                                className="w-full text-left px-3 py-2 text-xs hover:bg-surface-bright transition-colors flex items-center gap-2"
+                              >
+                                <span className="material-symbols-outlined text-sm text-secondary">select_all</span>
+                                Selecionar todos ({displayTotal})
+                              </button>
+                              {selectedIds.size > 0 && (
+                                <button
+                                  onClick={() => { setSelectedIds(new Set()); setShowSelectMenu(false); }}
+                                  className="w-full text-left px-3 py-2 text-xs hover:bg-surface-bright transition-colors flex items-center gap-2 text-secondary"
+                                >
+                                  <span className="material-symbols-outlined text-sm">deselect</span>
+                                  Limpar seleção
+                                </button>
+                              )}
+                            </div>
+                          </>
+                        )}
+                      </div>
                     </th>
                     <th className="px-4 py-4 text-[10px] font-black uppercase tracking-widest text-secondary">Contato</th>
                     <th className="px-4 py-4 text-[10px] font-black uppercase tracking-widest text-secondary">WhatsApp</th>
