@@ -89,7 +89,42 @@ export async function sendersRoutes(app: FastifyInstance) {
 
     if (!sender) return reply.status(404).send({ error: "Remetente não encontrado" });
 
-    const token = sender.uzapi_token;
+    let token = sender.uzapi_token;
+    const instanceName = (sender.settings as Record<string, unknown>)?.instance_name as string
+      || sender.uzapi_instance_id;
+
+    // 0. Verifica se a instância ainda existe na Uazapi; se não, recria
+    let instanceExists = true;
+    try {
+      await uzapiFetch("/instance/status", { method: "GET", token });
+    } catch {
+      instanceExists = false;
+    }
+
+    if (!instanceExists) {
+      try {
+        const uzapiData = await uzapiFetch("/instance/init", {
+          adminToken: true,
+          body: { name: instanceName, systemName: "apilocal" },
+        });
+
+        const newToken = uzapiData.token;
+        if (!newToken) {
+          return reply.status(502).send({ error: "Uazapi não retornou token ao recriar instância" });
+        }
+
+        token = newToken;
+
+        // Atualiza token no banco
+        await supabaseAdmin
+          .from("senders")
+          .update({ uzapi_token: newToken })
+          .eq("id", id);
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : "Erro ao recriar instância na Uazapi";
+        return reply.status(502).send({ error: msg });
+      }
+    }
 
     // 1. Configura webhook (antes do pair code)
     try {
@@ -188,8 +223,9 @@ export async function sendersRoutes(app: FastifyInstance) {
         profilePicUrl: instance.profilePicUrl || null,
       };
     } catch {
+      // Instância não existe mais na Uazapi — marca como desconectado
       await supabaseAdmin.from("senders").update({ status: "disconnected" }).eq("id", id);
-      return { status: "disconnected", error: "Falha ao conectar com Uazapi" };
+      return { status: "disconnected", needsReconnect: true, error: "Instância não encontrada na Uazapi — clique em Conectar para recriar" };
     }
   });
 
